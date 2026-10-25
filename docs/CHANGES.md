@@ -41,3 +41,11 @@ If you later want them on the form, say so and it can be added deliberately as a
 * Client-side password hash and check: replaced by server auth.
 * `claude.use("db")` persistence: not available outside claude.ai; replaced by Supabase.
 * Reference format `NPCIHA/YYYY/<last 6 digits of timestamp>` replaced by `NPCIHA/YYYY/<6-digit database sequence>` (same shape, guaranteed unique).
+
+## Province, district and taluka selection (migration 003 + seed 004)
+* Registration form: Province (Sindh, read-only), searchable District and Taluka fields. Taluka loads only after a district is chosen and is cleared when the district changes.
+* New public read-only APIs: `GET /api/provinces`, `GET /api/districts?province_id=`, `GET /api/talukas?district_id=`. They return active records only; talukas are returned only when `verified = true`.
+* `/api/register` now requires a valid district (and a taluka when the district has verified talukas). The server checks that the district belongs to the province and the taluka belongs to the district.
+* Database: `provinces` table; `districts.province_id`; `talukas.verified`, `talukas.source`; `members.province_id`. Existing rows and data are kept.
+* Talukas are imported from a secondary source (Wikipedia, "List of tehsils of Sindh") with `verified = false`, so they are NOT shown to applicants until each one is checked against an official Government of Sindh / Board of Revenue source and set to `verified = true`.
+* Karachi districts have no talukas (their sub-units are towns), so a taluka is not required there.

@@ -7,11 +7,16 @@ const crypto = require('crypto');
 const KEY = 'test-service-role-key';
 const state = { t: {}, files: new Map(), seq: 0, rate: new Map(), fail: null };
 function reset() {
-  state.t = { districts: [], talukas: [], members: [], admins: [], admin_sessions: [], audit_log: [] };
+  state.t = { provinces: [{ id: 1, code: 'sindh', name: 'Sindh', active: true }], districts: [], talukas: [], members: [], admins: [], admin_sessions: [], audit_log: [] };
   state.files.clear(); state.seq = 0; state.rate.clear(); state.fail = null;
   const names = ['Hyderabad', 'Sukkur', 'Larkana'];
-  names.forEach((n, i) => state.t.districts.push({ id: i + 1, code: n.toLowerCase(), name: n, name_ur: null, active: true }));
-  state.t.talukas.push({ id: 1, district_id: 1, name: 'Latifabad', name_ur: null, active: true }, { id: 2, district_id: 1, name: 'Qasimabad', name_ur: null, active: true }, { id: 3, district_id: 2, name: 'Rohri', name_ur: null, active: true });
+  names.forEach((n, i) => state.t.districts.push({ id: i + 1, province_id: 1, code: n.toLowerCase(), name: n, name_ur: null, active: true }));
+  state.t.districts.push({ id: 4, province_id: 1, code: 'karachi-central', name: 'Karachi Central', name_ur: null, active: true }); // no talukas (towns, not talukas)
+  state.t.talukas.push(
+    { id: 1, district_id: 1, name: 'Latifabad', name_ur: null, active: true, verified: true, source: 'test' },
+    { id: 2, district_id: 1, name: 'Qasimabad', name_ur: null, active: true, verified: true, source: 'test' },
+    { id: 3, district_id: 2, name: 'Rohri', name_ur: null, active: true, verified: true, source: 'test' },
+    { id: 4, district_id: 1, name: 'Unverifiedtown', name_ur: null, active: true, verified: false, source: 'test' });
 }
 reset();
 
@@ -47,7 +52,8 @@ function defaults(table, r) {
   if (table === 'members') {
     r.id = r.id || crypto.randomUUID();
     if (!r.ref_no) { state.seq++; r.ref_no = 'NPCIHA/' + new Date().getFullYear() + '/' + String(state.seq).padStart(6, '0'); }
-    Object.assign(r, { status: 'pending', created_at: now, updated_at: now, district_id: null, taluka_id: null, status_note: null, reviewed_by: null, reviewed_at: null }, r);
+    const given = { ...r }; // caller's values must win over these defaults
+    Object.assign(r, { status: 'pending', created_at: now, updated_at: now, district_id: null, taluka_id: null, province_id: null, status_note: null, reviewed_by: null, reviewed_at: null }, given);
   }
   if (table === 'admins') Object.assign(r, { id: r.id || crypto.randomUUID(), active: true, failed_attempts: 0, locked_until: null, last_login_at: null, created_at: now }, r);
   if (table === 'admin_sessions') r.created_at = now;

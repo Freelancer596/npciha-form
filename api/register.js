@@ -4,6 +4,7 @@ const sb = require('../lib/sb');
 const { MAX_BODY, secHeaders, send, sendError, sameOrigin, readJson, handleError } = require('../lib/http');
 const { validateRegistration, validatePhoto } = require('../lib/validate');
 const { rateLimit } = require('../lib/auth');
+const { validateLocation } = require('../lib/location');
 
 const RATE_MAX = Math.min(Math.max(parseInt(process.env.REGISTER_RATE_MAX || '30', 10) || 30, 1), 500);
 
@@ -47,6 +48,10 @@ module.exports = async (req, res) => {
     }
     const v = r.value;
 
+    // Province / district / taluka must exist, be active, and match each other (checked in the database).
+    const loc = await validateLocation(body);
+    if (!loc.ok) return sendError(res, 422, 'validation_failed', 'Please correct the highlighted information.', { fields: loc.errors });
+
     // Idempotent retry: same submission token already saved -> return the saved record, do not create another.
     const prior = await sb.select('members', [['submission_token', 'eq.' + v.submission_token], ['select', STORED], ['limit', '1']], { single: true });
     if (prior.data) {
@@ -70,6 +75,7 @@ module.exports = async (req, res) => {
         religion: v.religion, education: v.education || null, designation: v.designation, wing: v.wing,
         residence_address: v.residence_address, office_address: v.office_address || null, profession: v.profession || null,
         contact: v.contact, email: v.email || null, photo_path: photoPath,
+        province_id: loc.value.province_id, district_id: loc.value.district_id, taluka_id: loc.value.taluka_id,
       }, { query: [['select', 'ref_no,created_at']] });
       row = out && out[0];
       if (!row || !row.ref_no) throw new sb.DbError('db', 500, 'no_row');
