@@ -53,3 +53,6 @@ If you later want them on the form, say so and it can be added deliberately as a
 ## Taluka as free text (migration 005)
 * The taluka field on the registration form is now a plain text box. The applicant types the taluka name; it is stored in `members.taluka_name` (max 100 characters, letters only).
 * The taluka list is no longer required on the public form. Talukas in `public.talukas` remain for the admin panel.
+
+## Verified membership form template
+* The printed membership PDF (page 1) now uses the verified NPCIH (A) membership form as its template. Text positions were aligned to the form's lines. Page 2 (photo) is unchanged.
