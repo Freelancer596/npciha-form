@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>NPCIHA Admin Setup</title>
+<style>
+:root{--g:#3f5a2a;--gd:#2b3d1c;--au:#c9a227;--bg:#e6e4d4;--c:#f5f3e6;--t:#1b2314;--m:#5d6650;--b:#a9ad90}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:16px/1.5 "Segoe UI",Roboto,Arial,sans-serif}
+header{background:linear-gradient(180deg,var(--gd),var(--g));color:#fff;padding:16px;border-bottom:4px solid var(--au)}header h1{font-size:18px;margin:0;letter-spacing:2px;text-transform:uppercase}
+main{max-width:520px;margin:auto;padding:16px 16px 40px}.card{background:var(--c);border:1px solid var(--b);border-top:3px solid var(--g);padding:18px;box-shadow:0 2px 0 var(--au)}
+label{display:block;font-weight:700;margin:14px 0 4px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--g)}
+input,select{width:100%;padding:11px;border:1px solid var(--b);border-radius:2px;background:var(--bg);color:var(--t);font-size:16px}
+.btn{margin-top:20px;width:100%;padding:14px;border:0;border-bottom:3px solid var(--au);background:var(--g);color:#fff;font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.msg{margin-top:12px;font-size:14px;color:var(--m)}small{color:var(--m)}
+</style></head><body>
+<header><h1>NPCIHA &ndash; Administrator Setup</h1></header>
+<main><div class="card">
+<p class="msg" style="margin-top:0">Creates an administrator, or resets the password if the username already exists. Works only while <b>SETUP_TOKEN</b> is set on the server. Remove it from Vercel when you are finished.</p>
+<form id="f" onsubmit="return false" autocomplete="off">
+<label>Setup token</label><input id="tok" type="password" autocomplete="off" required>
+<label>Username</label><input id="un" autocapitalize="none" spellcheck="false" required><small>3-40 characters: a-z, 0-9, . _ -</small>
+<label>Full name (optional)</label><input id="fn">
+<label>Password</label><input id="pw" type="password" autocomplete="new-password" required><small>At least 12 characters.</small>
+<label>Role</label><select id="role"><option value="super_admin">Super Admin (all districts)</option><option value="district_admin">District Admin</option><option value="data_entry">Data Entry Operator</option></select>
+<div id="dw" style="display:none"><label>District code</label><input id="dc" autocapitalize="none" placeholder="e.g. hyderabad"><small>Code from the districts table in Supabase.</small></div>
+<button class="btn" id="go">Create / Update Administrator</button><div class="msg" id="m"></div>
+</form></div></main>
+<script>
+const $=i=>document.getElementById(i);
+$("role").onchange=()=>{$("dw").style.display=$("role").value==="super_admin"?"none":"block"};
+$("go").onclick=async()=>{const f=$("f");if(!f.reportValidity())return;$("go").disabled=true;$("m").textContent="Working…";
+ try{const r=await fetch("/api/setup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:$("tok").value,username:$("un").value,full_name:$("fn").value,password:$("pw").value,role:$("role").value,district_code:$("dc").value})});
+  const j=await r.json().catch(()=>null);$("m").textContent=j&&j.message?j.message:"Request failed.";if(j&&j.ok){$("pw").value="";$("tok").value=""}}
+ catch(e){$("m").textContent="Could not reach the server."}$("go").disabled=false};
+</script></body></html>

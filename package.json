@@ -1,0 +1,10 @@
+{
+  "name": "npciha-membership",
+  "version": "2.0.0",
+  "private": true,
+  "description": "NPCIH-A Sindh membership website (static front end + Vercel serverless API + Supabase)",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "test": "node tests/run-tests.js"
+  }
+}
