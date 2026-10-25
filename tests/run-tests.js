@@ -195,7 +195,7 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('GET', '/api/admin/members?q=42101-3333333-3', { admin: true, cookie: S.cookie }); ok('search by CNIC works for super admin', r.j.total === 1 && r.j.members[0].name === 'Dilip Kumar');
   r = await call('GET', '/api/admin/members?q=' + encodeURIComponent("x'),name.ilike.(*"), { admin: true, cookie: S.cookie }); ok('filter-injection attempt in search is neutralised (no error, no leak)', r.s === 200 && r.j.total === 0);
   r = await call('GET', '/api/admin/members?status=approved', { admin: true, cookie: S.cookie }); ok('status filter works (none approved yet)', r.j.total === 0);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date()); // the app's day is Karachi time
   r = await call('GET', `/api/admin/members?date_from=${today}&date_to=${today}`, { admin: true, cookie: S.cookie }); ok('registration-date filter works', r.j.total === 4);
 
   // ---- role scoping ----
