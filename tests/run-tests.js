@@ -271,7 +271,7 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('registration endpoint rate-limited per network (429)', last === 429);
 
 
-  // ---- province / district / taluka ----
+  // ---- province / district / free-text taluka ----
   await fetch(MOCK + '/__reset');
   r = await call('GET', '/api/provinces'); ok('GET /api/provinces returns only active provinces', r.s === 200 && r.j.items.length === 1 && r.j.items[0].code === 'sindh' && !('active' in r.j.items[0]));
   r = await call('GET', '/api/districts?province_id=1'); ok('GET /api/districts returns the province districts', r.s === 200 && r.j.items.length === 4);
@@ -280,34 +280,25 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   state.t.districts.find(x => x.id === 3).active = false;
   r = await call('GET', '/api/districts?province_id=1'); ok('districts: inactive district hidden from applicants', r.j.items.length === 3);
   state.t.districts.find(x => x.id === 3).active = true;
-  r = await call('GET', '/api/talukas?district_id=1'); ok('GET /api/talukas returns VERIFIED talukas only (unverified hidden)', r.s === 200 && r.j.items.map(x => x.name).sort().join() === 'Latifabad,Qasimabad');
-  r = await call('GET', '/api/talukas?district_id=4'); ok('talukas: Karachi district (no talukas) -> empty list', r.s === 200 && r.j.items.length === 0);
-  r = await call('GET', '/api/talukas?district_id=1;DROP'); ok('talukas: malformed id -> 422', r.s === 422);
-  r = await call('POST', '/api/provinces', {}); ok('provinces: POST refused (405)', r.s === 405);
 
   const locBad = async (label, patch, field) => { const before = (await dump()).t.members.length; const x = await call('POST', '/api/register', { body: form(patch) }); const after = (await dump()).t.members.length; ok('location: ' + label + ' rejected (422) and not saved', x.s === 422 && !!(x.j.fields && x.j.fields[field]) && before === after, x.s + ' ' + x.text.slice(0, 160)); };
-  await locBad('taluka from ANOTHER district (Rohri is in district 2)', { taluka_id: 3 }, 'taluka');
-  await locBad('unverified taluka', { taluka_id: 4 }, 'taluka');
-  await locBad('unknown taluka id', { taluka_id: 999 }, 'taluka');
-  await locBad('taluka missing for a district that has talukas', { taluka_id: undefined }, 'taluka');
-  await locBad('district that does not exist', { district_id: 999, taluka_id: undefined }, 'district');
-  await locBad('district missing', { district_id: undefined, taluka_id: undefined }, 'district');
+  await locBad('district that does not exist', { district_id: 999 }, 'district');
+  await locBad('district missing', { district_id: undefined }, 'district');
   await locBad('province that does not exist', { province_id: 42 }, 'province');
   state.t.provinces.push({ id: 2, code: 'punjab', name: 'Punjab', active: true });
   await locBad('district that belongs to another province', { province_id: 2, district_id: 1 }, 'district');
   await locBad('non-numeric district id', { district_id: "1' OR '1'='1" }, 'district');
-  await locBad('negative taluka id', { taluka_id: -5 }, 'taluka');
+  await locBad('taluka longer than 100 characters', { taluka_name: 'A'.repeat(101) }, 'taluka');
+  await locBad('taluka with script/markup', { taluka_name: '<script>x</script>' }, 'taluka');
 
-  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7000001-1', taluka_id: 2 }) });
-  ok('valid Hyderabad + Qasimabad saved with correct district/taluka/province IDs', r.s === 201, r.text.slice(0, 160));
-  let dm = (await dump()).t.members.find(m => m.cnic === '42101-7000001-1');
-  ok('stored row holds province_id=1, district_id=1, taluka_id=2', dm && dm.province_id === 1 && dm.district_id === 1 && dm.taluka_id === 2, JSON.stringify((await dump()).t.members.map(m => [m.cnic, m.province_id, m.district_id, m.taluka_id])));
-  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7000002-1', district_id: 4, taluka_id: undefined }) });
-  ok('Karachi district (no talukas) saved without a taluka', r.s === 201);
-  dm = (await dump()).t.members.find(m => m.cnic === '42101-7000002-1');
-  ok('Karachi row stores district_id=4 and taluka_id=null', dm && dm.district_id === 4 && dm.taluka_id === null);
-  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7000003-1', taluka_id: null, district_id: 4 }) });
-  ok('explicit null taluka accepted for Karachi district', r.s === 201);
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7000001-1', taluka_name: 'Kandhkot' }) });
+  ok('typed taluka saved with province/district IDs', r.s === 201, r.text.slice(0, 160));
+  const dm = (await dump()).t.members.find(m => m.cnic === '42101-7000001-1');
+  ok('stored row: province_id=1, district_id=1, taluka_name="Kandhkot"', dm && dm.province_id === 1 && dm.district_id === 1 && dm.taluka_name === 'Kandhkot', JSON.stringify(dm && [dm.province_id, dm.district_id, dm.taluka_name]));
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7000002-1', district_id: 4, taluka_name: '' }) });
+  ok('district without a taluka typed -> saved with taluka_name null', r.s === 201);
+  const dm2 = (await dump()).t.members.find(m => m.cnic === '42101-7000002-1');
+  ok('row stores taluka_name=null when left empty', dm2 && dm2.taluka_name === null && dm2.district_id === 4);
 
   // ---- secrets scan ----
   const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(path.join(dir, e.name))) : [path.join(dir, e.name)]);

@@ -49,3 +49,7 @@ If you later want them on the form, say so and it can be added deliberately as a
 * Database: `provinces` table; `districts.province_id`; `talukas.verified`, `talukas.source`; `members.province_id`. Existing rows and data are kept.
 * Talukas are imported from a secondary source (Wikipedia, "List of tehsils of Sindh") with `verified = false`, so they are NOT shown to applicants until each one is checked against an official Government of Sindh / Board of Revenue source and set to `verified = true`.
 * Karachi districts have no talukas (their sub-units are towns), so a taluka is not required there.
+
+## Taluka as free text (migration 005)
+* The taluka field on the registration form is now a plain text box. The applicant types the taluka name; it is stored in `members.taluka_name` (max 100 characters, letters only).
+* The taluka list is no longer required on the public form. Talukas in `public.talukas` remain for the admin panel.

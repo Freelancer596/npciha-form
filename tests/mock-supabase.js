@@ -53,7 +53,7 @@ function defaults(table, r) {
     r.id = r.id || crypto.randomUUID();
     if (!r.ref_no) { state.seq++; r.ref_no = 'NPCIHA/' + new Date().getFullYear() + '/' + String(state.seq).padStart(6, '0'); }
     const given = { ...r }; // caller's values must win over these defaults
-    Object.assign(r, { status: 'pending', created_at: now, updated_at: now, district_id: null, taluka_id: null, province_id: null, status_note: null, reviewed_by: null, reviewed_at: null }, given);
+    Object.assign(r, { status: 'pending', created_at: now, updated_at: now, district_id: null, taluka_id: null, taluka_name: null, province_id: null, status_note: null, reviewed_by: null, reviewed_at: null }, given);
   }
   if (table === 'admins') Object.assign(r, { id: r.id || crypto.randomUUID(), active: true, failed_attempts: 0, locked_until: null, last_login_at: null, created_at: now }, r);
   if (table === 'admin_sessions') r.created_at = now;

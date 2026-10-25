@@ -33,7 +33,7 @@ nav button{box-shadow:0 6px 14px rgba(0,0,0,.4)}.btn{box-shadow:0 8px 18px rgba(
 <div><label>Education <span>تعلیم</span></label><input id="education" type="text"></div></div>
 <div class="row"><div><label>Designation <span>عہدہ</span></label><input id="designation" placeholder="Write your designation" required></div>
 <div><label>Wing <span>ونگ</span></label><select id="wing"><option>HRC</option></select></div></div>
-<div class="row"><div><label>Province <span>صوبہ</span></label><input id="prov" value="Sindh" readonly></div><div><label>District <span>ضلع</span></label><input id="dist" list="dist_list" placeholder="Search or select district" autocomplete="off"><datalist id="dist_list"></datalist></div></div><label>Taluka <span>تحصیل</span></label><input id="tal" list="tal_list" placeholder="Select district first" autocomplete="off" disabled><datalist id="tal_list"></datalist><div class="msg" id="locm"></div>
+<div class="row"><div><label>Province <span>صوبہ</span></label><input id="prov" value="Sindh" readonly></div><div><label>District <span>ضلع</span></label><input id="dist" list="dist_list" placeholder="Search or select district" autocomplete="off"><datalist id="dist_list"></datalist></div></div><label>Taluka <span>تحصیل</span></label><input id="tal" placeholder="Type taluka name" autocomplete="off"><div class="msg" id="locm"></div>
 <label>Residence Address <span>مستقل پتہ</span></label><input id="res" required>
 <label>Office Address <span>دفتر کا پتہ</span></label><input id="off">
 <div class="row"><div><label>Profession <span>کاروبار</span></label><input id="prof"></div>
@@ -85,21 +85,8 @@ async function initLoc(){const ps=await pubGet("provinces");const sindh=ps&&(ps.
  const ds=LOC.province_id?await pubGet("districts?province_id="+LOC.province_id):null;
  if(!ds){locMsg("Districts could not be loaded. Check your connection and reload the page.",true);return}
  LOC.districts=ds;$("dist_list").textContent="";ds.forEach(d=>{const o=document.createElement("option");o.value=d.name;$("dist_list").append(o)})}
-function onDist(){const raw=$("dist").value;const d=findByName(LOC.districts,raw);
- if(!d){LOC.district_id=null;LOC.talukas=[];LOC.taluka_id=null;$("tal").value="";$("tal_list").textContent="";$("tal").disabled=true;$("tal").placeholder="Select district first";
-  locMsg(raw.trim()?"No matching district. Choose one from the list.":"",!!raw.trim());return}
- if(d.id===LOC.district_id)return;
- LOC.district_id=d.id;LOC.taluka_id=null;$("tal").value="";loadTal(d.id)}
-async function loadTal(did){const my=++LOC.tseq;$("tal").disabled=true;$("tal").placeholder="Loading talukas…";locMsg("");
- const ts=await pubGet("talukas?district_id="+did);if(my!==LOC.tseq)return;
- if(!ts){LOC.talukas=[];$("tal").placeholder="Could not load talukas";locMsg("Talukas could not be loaded. Choose the district again or reload the page.",true);return}
- LOC.talukas=ts;$("tal_list").textContent="";ts.forEach(t=>{const o=document.createElement("option");o.value=t.name;$("tal_list").append(o)});
- $("tal").disabled=false;$("tal").placeholder=ts.length?"Search or select taluka":"No taluka list for this district";
- locMsg(ts.length?"":"No taluka list is available for this district yet. You can continue without a taluka.",false)}
-function onTal(){const raw=$("tal").value;const t=findByName(LOC.talukas,raw);LOC.taluka_id=t?t.id:null;
- if(raw.trim()&&!t)locMsg("No matching taluka. Choose one from the list.",true);else if(t)locMsg("")}
+function onDist(){const raw=$("dist").value;const d=findByName(LOC.districts,raw);LOC.district_id=d?d.id:null;locMsg(raw.trim()&&!d?"No matching district. Choose one from the list.":"",!!(raw.trim()&&!d))}
 $("dist").addEventListener("input",onDist);$("dist").addEventListener("change",onDist);
-$("tal").addEventListener("input",onTal);$("tal").addEventListener("change",onTal);
 initLoc();
 $("cnic").addEventListener("input",()=>{TOK=uuid()});
 $("cnic").oninput=e=>{let v=e.target.value.replace(/\D/g,"").slice(0,13);e.target.value=v.length>12?v.slice(0,5)+"-"+v.slice(5,12)+"-"+v.slice(12):v.length>5?v.slice(0,5)+"-"+v.slice(5):v};
@@ -107,9 +94,8 @@ $("go").onclick=async()=>{const f=$("f");if(!f.reportValidity())return;if(!$("pv
  if(!/^\d{5}-\d{7}-\d$/.test($("cnic").value)){$("msg").textContent="CNIC must be 13 digits (#####-#######-#).";return}
  if(!/^(\+?92|0)?3\d{9}$/.test($("contact").value.replace(/[\s\-().]/g,""))){$("msg").textContent="Enter a valid mobile number, e.g. 03001234567.";return}
  if(!LOC.district_id){locMsg("Select a district from the list.",true);$("dist").focus();return}
- if(LOC.talukas.length&&!LOC.taluka_id){locMsg("Select a taluka from the list.",true);$("tal").focus();return}
  $("go").disabled=true;$("msg").textContent="Saving registration…";
- const q={name:$("name").value,father:$("father").value,cnic:$("cnic").value,dob:$("dob").value,religion:$("religion").value,education:$("education").value,designation:$("designation").value,wing:$("wing").value,res:$("res").value,off:$("off").value,prof:$("prof").value,contact:$("contact").value,email:$("email").value,photo:$("pv").src,token:TOK,province_id:LOC.province_id,district_id:LOC.district_id,taluka_id:LOC.taluka_id};
+ const q={name:$("name").value,father:$("father").value,cnic:$("cnic").value,dob:$("dob").value,religion:$("religion").value,education:$("education").value,designation:$("designation").value,wing:$("wing").value,res:$("res").value,off:$("off").value,prof:$("prof").value,contact:$("contact").value,email:$("email").value,photo:$("pv").src,token:TOK,province_id:LOC.province_id,district_id:LOC.district_id,taluka_name:$("tal").value.trim()};
  const R=await api("register",{method:"POST",json:q});
  if(!R.j||!R.j.ok){let t=R.j&&R.j.message||"Could not reach the server. Your information is still on this page. Check your connection and try again.";if(R.j&&R.j.fields)t+=" "+Object.values(R.j.fields).join(" ");$("msg").textContent="Not saved. "+t;$("go").disabled=false;return}
  const x=R.j.member,m={name:x.name,father:x.father,cnic:x.cnic,dob:fmt(x.dob),religion:x.religion,education:x.education,designation:x.designation,wing:x.wing,res:x.res,off:x.off,prof:x.prof,contact:x.contact,email:x.email,photo:$("pv").src,date:x.date,ref:x.ref};

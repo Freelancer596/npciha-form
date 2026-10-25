@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
         religion: v.religion, education: v.education || null, designation: v.designation, wing: v.wing,
         residence_address: v.residence_address, office_address: v.office_address || null, profession: v.profession || null,
         contact: v.contact, email: v.email || null, photo_path: photoPath,
-        province_id: loc.value.province_id, district_id: loc.value.district_id, taluka_id: loc.value.taluka_id,
+        province_id: loc.value.province_id, district_id: loc.value.district_id, taluka_name: loc.value.taluka_name,
       }, { query: [['select', 'ref_no,created_at']] });
       row = out && out[0];
       if (!row || !row.ref_no) throw new sb.DbError('db', 500, 'no_row');
