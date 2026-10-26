@@ -375,7 +375,7 @@
     });
 
     const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace || texture.colorSpace;
+    if (THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
     texture.anisotropy = 4;
     return texture;
   }
