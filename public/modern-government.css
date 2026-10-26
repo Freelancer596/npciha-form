@@ -452,3 +452,6 @@ html.portal-motion-ready .portal-section-heading[data-motion-reveal].motion-visi
 @media(prefers-reduced-motion:reduce) {
   .portal-admin-intro,#list > div:not(.msg) { transform:none!important; }
 }
+
+/* The legacy Three.js canvas is intentionally dormant: this branch uses CSS 3D and motion primitives. */
+#bg { display:none!important; }
