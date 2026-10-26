@@ -985,3 +985,25 @@ input:focus, select:focus, textarea:focus {
 @media(prefers-reduced-motion:reduce) {
   .portal-hero-ready .portal-hero-3d { animation:none!important; }
 }
+
+
+/* WebGL globe canvas: the painted CSS globe remains the no-WebGL fallback. */
+.portal-globe-webgl { isolation:isolate; }
+.portal-globe canvas.portal-webgl-globe {
+  position:absolute!important;
+  inset:0!important;
+  z-index:2!important;
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  padding:0!important;
+  border:0!important;
+  margin:0!important;
+  pointer-events:none!important;
+}
+.portal-globe-webgl .portal-globe-map,
+.portal-globe-webgl .portal-globe-graticule,
+.portal-globe-webgl .portal-globe-shine,
+.portal-globe-webgl .portal-globe-pin { display:none!important; }
+.portal-globe-webgl .portal-webgl-globe { border-radius:50%; }
