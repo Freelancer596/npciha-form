@@ -97,7 +97,7 @@
     window.addEventListener("resize", updateProgress, { passive: true });
     updateProgress();
 
-    const revealSelector = "#v1, #v2, #lock, #tb, .portal-section-heading, .portal-admin-intro";
+    const revealSelector = "#v1, #v2, #lock, #tb, .portal-section-heading, .portal-admin-intro, #list > div:not(.msg)";
     function revealElements(root) {
       const nodes = [];
       if (root && root.matches && root.matches(revealSelector)) nodes.push(root);
