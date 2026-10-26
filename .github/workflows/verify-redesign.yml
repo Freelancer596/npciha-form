@@ -1,0 +1,26 @@
+name: Verify NPCIH-A redesign
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [redesign/modern-government-portal]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check redesign JavaScript syntax
+        run: node --check public/modern-government.js
+      - name: Run API regression suite
+        run: npm test
