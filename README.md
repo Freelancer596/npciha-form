@@ -147,3 +147,21 @@ See `docs/CHANGES.md` and `docs/TEST-REPORT.md` for exactly what changed and wha
 - Membership PDF is generated as exactly two pages: page 1 is the completed form; page 2 is the member photo with name and application number.
 - The Share on WhatsApp button opens the administrator chat at `923336305884` and pre-fills only the member name and application number. The member must press Send. The PDF is not attached to WhatsApp.
 - The application must first be saved successfully by the backend before the WhatsApp action becomes available.
+
+## Optional: mirror new applications to Google Sheets
+
+Supabase remains the authoritative database. When configured, each newly submitted application is also appended to a private Google Sheet. A Google Sheets outage does not block the registration, and the row is not a substitute for the database.
+
+1. In Google Cloud Console, create/select a project and enable **Google Sheets API**.
+2. Create a **Service Account** and generate a JSON key. Keep the JSON private; never commit it to GitHub or place it in front-end code.
+3. Create a Google spreadsheet and add a tab named **Applications** (or choose another tab name).
+4. Share the spreadsheet with the service account's `client_email` as **Editor**. Do not turn on public sharing.
+5. In Vercel → Project → Settings → Environment Variables, add:
+   - `GOOGLE_SHEETS_SPREADSHEET_ID`: the long ID from the spreadsheet URL between `/d/` and `/edit`.
+   - `GOOGLE_SERVICE_ACCOUNT_JSON`: the complete contents of the downloaded service-account JSON file, as one JSON value.
+   - `GOOGLE_SHEETS_TAB_NAME`: `Applications` (must match the tab name).
+6. Apply to Production (and Preview if needed), then redeploy Vercel.
+7. Submit a test application. The first row is created as column headings; subsequent new applications are appended.
+
+The sheet includes application reference/date, applicant details and location IDs/taluka. It does not copy the uploaded photo. The spreadsheet contains personal information such as CNIC, so keep sharing restricted to authorized staff only. If the sync fails, the registration still remains saved in Supabase; check Vercel Function Logs for a `Google Sheets sync failed` message.
+
