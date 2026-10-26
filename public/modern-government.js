@@ -290,3 +290,30 @@
     addPremiumHero();
   }
 })();
+
+
+/* Keep the public landing hero out of the admin workspace; restore it on Back to Form. */
+(function () {
+  "use strict";
+  function bindHeroView() {
+    const hero = document.getElementById("portal-hero-3d");
+    const adminToggle = document.getElementById("t2");
+    const backButton = document.getElementById("back");
+    const adminPanel = document.getElementById("v2");
+    if (!hero || !adminToggle || !adminPanel) return;
+
+    adminToggle.addEventListener("click", function () {
+      hero.classList.toggle("portal-hero-hidden", !adminPanel.classList.contains("hide"));
+    });
+    if (backButton) {
+      backButton.addEventListener("click", function () {
+        hero.classList.remove("portal-hero-hidden");
+      });
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindHeroView, { once: true });
+  } else {
+    bindHeroView();
+  }
+})();
