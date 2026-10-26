@@ -12,12 +12,12 @@ This change introduces a new visual layer for the existing NPCIH-A HRC Wing Sind
 - Dark mode follows the device color-scheme preference.
 
 ## UI changes
-- Replaced the visual background treatment with a lightweight, flat institutional layout.
+- Added restrained animated teal/gold ambient orbs, a moving header sheen, a top scroll-progress indicator, and layered institutional surfaces.
 - Added four visual form sections: personal details, organisation, address/contact, and photograph.
 - Restyled form controls, photo selection, submit/PDF/WhatsApp actions, and validation messages.
 - Added a secure administration intro panel and refreshed the login and member management surfaces.
 - Added mobile-first single-column layouts and larger touch targets.
-- Removed the unused Three.js script payload to reduce unnecessary downloads on lower-end phones.
+- Uses CSS perspective, pointer-aware 3D tilt, and lightweight JavaScript reveal/hover motion without adding an animation-library dependency; the legacy Three.js canvas stays dormant.
 
 ## Compatibility constraints
 - Existing form field IDs are preserved.
@@ -25,9 +25,15 @@ This change introduces a new visual layer for the existing NPCIH-A HRC Wing Sind
 - Existing admin actions (search, filters, summary, CSV export, audit log and sign out) remain the controls wired by the original application.
 - The existing form still decides when a save has succeeded; the visual layer does not fake a success response.
 
+## Validation status (2026-10-26)
+- GitHub Actions: **passed** on the redesign branch (JavaScript syntax check + API regression suite).
+- API regression suite: **156 passed, 0 failed** against the in-memory Supabase mock. This does not prove live Supabase/RLS configuration.
+- Vercel preview: build **READY** at `https://npciha-membership-p1omo50jq-zs-dc21.vercel.app` for commit `af7fe37d9e6ad5461951341f070ff124f13d826a`. The project has Vercel SSO protection enabled for preview deployments.
+- The preview build completed; interactive browser checks against the real Supabase service have not been performed.
+
 ## Validation checklist
 Before merging or deploying:
-1. Run `npm test` in a Node.js 22 environment.
+1. Confirm the GitHub Actions `Verify NPCIH-A redesign` workflow remains green.
 2. Confirm `/api/health` reports the expected service status without exposing secrets.
 3. Test a valid registration and duplicate-CNIC response against a configured Supabase project.
 4. Confirm the application reference and exactly two-page PDF are generated only after a successful save.
