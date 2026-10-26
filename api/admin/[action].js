@@ -184,8 +184,9 @@ H.status = async (req, res, admin) => {
 
 H.summary = async (req, res, admin) => {
   const rows = await sb.rpc('admin_summary', { p_district_id: A.can(admin, 'all_districts') ? null : admin.district_id });
-  const g = await geo();
-  const names = new Map(g.districts.map(d => [d.id, d.name]));
+  // Summary only needs district names; avoid loading every taluka for this request.
+  const d = await sb.select('districts', [['select', 'id,name'], ['order', 'name.asc'], ['limit', '500']]);
+  const names = new Map(d.data.map(item => [item.id, item.name]));
   const by = new Map(); const totals = { pending: 0, approved: 0, rejected: 0, total: 0 };
   for (const r of rows) {
     const k = r.district_id === null ? 'none' : r.district_id;
