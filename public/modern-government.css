@@ -973,3 +973,15 @@ input:focus, select:focus, textarea:focus {
   .portal-hero-visual { transform:none!important; }
   .portal-hero-cta { transition:none!important; }
 }
+
+
+/* Final polish: hero visibility follows the existing Admin / Back to Form switch. */
+.portal-hero-hidden { display:none!important; }
+@keyframes portal-hero-enter {
+  from { opacity:0; transform:translate3d(0,14px,-8px) scale(.99); }
+  to { opacity:1; transform:translate3d(0,0,0) scale(1); }
+}
+.portal-hero-ready .portal-hero-3d { animation:portal-hero-enter .75s cubic-bezier(.2,.75,.25,1) both; }
+@media(prefers-reduced-motion:reduce) {
+  .portal-hero-ready .portal-hero-3d { animation:none!important; }
+}
