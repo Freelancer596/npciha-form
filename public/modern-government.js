@@ -317,3 +317,255 @@
     bindHeroView();
   }
 })();
+
+
+/* Real 3D globe enhancement using the project's existing CSP-allowed CDN policy.
+   The CSS globe remains visible when WebGL or the optional CDN is unavailable. */
+(function () {
+  "use strict";
+  const CDN = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+
+  function makeEarthTexture(THREE) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 512;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    const ocean = ctx.createLinearGradient(0, 0, 1024, 512);
+    ocean.addColorStop(0, "#86B0F4");
+    ocean.addColorStop(.44, "#4E87E4");
+    ocean.addColorStop(1, "#2855A9");
+    ctx.fillStyle = ocean;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const project = function (point) {
+      return [(point[0] + 180) / 360 * canvas.width, (90 - point[1]) / 180 * canvas.height];
+    };
+    const land = [
+      [[-168,70],[-145,70],[-133,59],[-123,52],[-124,41],[-112,30],[-102,24],[-91,19],[-83,9],[-78,9],[-81,25],[-96,28],[-110,33],[-118,48],[-130,55],[-150,61]],
+      [[-100,73],[-82,79],[-53,71],[-43,59],[-56,50],[-73,58],[-88,62]],
+      [[-81,12],[-68,8],[-50,-2],[-36,-11],[-42,-28],[-54,-43],[-68,-55],[-76,-29],[-81,-5]],
+      [[-12,71],[14,71],[32,61],[43,48],[36,37],[26,35],[18,47],[7,56],[-8,58]],
+      [[-18,35],[2,38],[25,32],[42,12],[39,-10],[24,-35],[10,-35],[-2,-17],[-12,1],[-18,20]],
+      [[30,67],[60,72],[91,67],[112,57],[139,55],[163,48],[153,35],[130,24],[119,8],[105,1],[95,9],[77,7],[60,22],[43,34],[34,49]],
+      [[112,-11],[131,-10],[153,-26],[146,-40],[128,-44],[114,-31]],
+      [[47,-13],[51,-17],[49,-25],[44,-22]],
+      [[-9,59],[-2,58],[0,51],[-6,50]],
+      [[-8,5],[2,4],[8,-1],[5,-7],[-1,-5]],
+      [[95,6],[115,4],[127,-5],[117,-10],[105,-7]],
+      [[130,34],[143,45],[146,36],[139,31]],
+      [[-74,83],[-20,82],[-28,61],[-50,58],[-65,69]],
+      [[-180,-68],[-120,-73],[-60,-70],[0,-74],[60,-70],[120,-74],[180,-68],[180,-90],[-180,-90]]
+    ];
+
+    land.forEach(function (polygon, index) {
+      ctx.beginPath();
+      polygon.forEach(function (point, i) {
+        const p = project(point);
+        if (i === 0) ctx.moveTo(p[0], p[1]);
+        else ctx.lineTo(p[0], p[1]);
+      });
+      ctx.closePath();
+      ctx.fillStyle = index === land.length - 1 ? "#E1EBF9" : "#DDE9FC";
+      ctx.strokeStyle = "rgba(255,255,255,.78)";
+      ctx.lineWidth = 1.5;
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace || texture.colorSpace;
+    texture.anisotropy = 4;
+    return texture;
+  }
+
+  function startGlobe() {
+    const element = document.querySelector("#portal-hero-3d .portal-globe");
+    const host = document.querySelector("#portal-hero-3d .portal-hero-visual");
+    if (!element || !host || element.dataset.webglReady === "true" || !window.THREE) return;
+    const THREE = window.THREE;
+
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance"
+      });
+    } catch (error) {
+      element.classList.add("portal-globe-fallback");
+      return;
+    }
+
+    const canvas = renderer.domElement;
+    canvas.className = "portal-webgl-globe";
+    canvas.setAttribute("aria-hidden", "true");
+    canvas.setAttribute("role", "presentation");
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, 1, .1, 40);
+    camera.position.set(0, 0, 4.2);
+    scene.add(new THREE.AmbientLight(0xDCE8FF, 1.45));
+
+    const keyLight = new THREE.DirectionalLight(0xFFFFFF, 2.25);
+    keyLight.position.set(-3.5, 4, 5);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x8CB9FF, .85);
+    fillLight.position.set(4, -2, 3);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.PointLight(0xC8A96B, .8, 10);
+    rimLight.position.set(-2, -1, -2);
+    scene.add(rimLight);
+
+    const earth = new THREE.Group();
+    scene.add(earth);
+
+    const texture = makeEarthTexture(THREE);
+    const sphereMaterial = new THREE.MeshStandardMaterial({
+      color: 0xFFFFFF,
+      map: texture || null,
+      roughness: .55,
+      metalness: .06
+    });
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.47, 72, 56), sphereMaterial);
+    earth.add(sphere);
+
+    /* Precision latitude/longitude curves, kept subtle so the globe stays clean. */
+    const gridMaterial = new THREE.LineBasicMaterial({
+      color: 0xFFFFFF,
+      transparent: true,
+      opacity: .34,
+      depthWrite: false
+    });
+    const radius = 1.483;
+
+    function addGridLine(points) {
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      earth.add(new THREE.Line(geometry, gridMaterial));
+    }
+    function surfacePoint(lon, lat) {
+      const phi = lat * Math.PI / 180;
+      const theta = lon * Math.PI / 180;
+      return new THREE.Vector3(
+        radius * Math.cos(phi) * Math.sin(theta),
+        radius * Math.sin(phi),
+        radius * Math.cos(phi) * Math.cos(theta)
+      );
+    }
+
+    for (let lat = -75; lat <= 75; lat += 15) {
+      const points = [];
+      for (let lon = -180; lon <= 180; lon += 3) points.push(surfacePoint(lon, lat));
+      addGridLine(points);
+    }
+    for (let lon = -180; lon < 180; lon += 30) {
+      const points = [];
+      for (let lat = -90; lat <= 90; lat += 3) points.push(surfacePoint(lon, lat));
+      addGridLine(points);
+    }
+
+    /* A small champagne locator floats just above the front hemisphere. */
+    const locator = new THREE.Mesh(
+      new THREE.SphereGeometry(.045, 16, 12),
+      new THREE.MeshStandardMaterial({ color: 0xC8A96B, emissive: 0x5B4218, emissiveIntensity: .28, metalness: .3, roughness: .35 })
+    );
+    locator.position.copy(surfacePoint(63, 26).multiplyScalar(1.025));
+    earth.add(locator);
+
+    element.insertBefore(canvas, element.querySelector(".portal-globe-pin"));
+    element.classList.add("portal-globe-webgl");
+    element.dataset.webglReady = "true";
+
+    let visible = true;
+    let frame = 0;
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function resize() {
+      const width = Math.max(1, element.clientWidth);
+      const height = Math.max(1, element.clientHeight);
+      if (width === lastWidth && height === lastHeight) return;
+      lastWidth = width;
+      lastHeight = height;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+    }
+
+    function tick() {
+      frame = 0;
+      if (visible && !document.hidden && element.isConnected && element.getClientRects().length) {
+        if (!reducedMotion) earth.rotation.y += .0017;
+        renderer.render(scene, camera);
+      }
+      if (!reducedMotion && element.isConnected) frame = window.requestAnimationFrame(tick);
+    }
+
+    resize();
+    if (!reducedMotion) frame = window.requestAnimationFrame(tick);
+    window.addEventListener("resize", resize, { passive: true });
+
+    if ("ResizeObserver" in window) {
+      const observer = new ResizeObserver(resize);
+      observer.observe(element);
+    }
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(function (entries) {
+        visible = !!entries[0] && entries[0].isIntersecting;
+        if (visible && reducedMotion) renderer.render(scene, camera);
+      });
+      observer.observe(host);
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && reducedMotion) renderer.render(scene, camera);
+    });
+
+    /* Release the GPU resources if the hero node is removed by another UI transition. */
+    const removalObserver = new MutationObserver(function () {
+      if (element.isConnected) return;
+      if (frame) window.cancelAnimationFrame(frame);
+      renderer.dispose();
+      sphere.geometry.dispose();
+      sphereMaterial.dispose();
+      if (texture) texture.dispose();
+      gridMaterial.dispose();
+      removalObserver.disconnect();
+    });
+    removalObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function loadThree() {
+    if (window.THREE && window.THREE.WebGLRenderer) {
+      startGlobe();
+      return;
+    }
+    if (document.querySelector('script[data-portal-three="true"]')) return;
+    const script = document.createElement("script");
+    script.src = CDN;
+    script.async = true;
+    script.dataset.portalThree = "true";
+    script.onload = startGlobe;
+    script.onerror = function () {
+      const globe = document.querySelector("#portal-hero-3d .portal-globe");
+      if (globe) globe.classList.add("portal-globe-fallback");
+    };
+    document.head.appendChild(script);
+  }
+
+  function schedule() {
+    const hero = document.getElementById("portal-hero-3d");
+    if (!hero) return;
+    if ("requestIdleCallback" in window) window.requestIdleCallback(loadThree, { timeout: 2200 });
+    else window.setTimeout(loadThree, 350);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", schedule, { once: true });
+  else schedule();
+})();
