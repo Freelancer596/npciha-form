@@ -569,3 +569,137 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", schedule, { once: true });
   else schedule();
 })();
+
+
+/* Button feedback layer: immediate loading states, duplicate-click protection,
+   and accessible status announcements. Existing handlers and API/PDF logic remain intact. */
+(function () {
+  "use strict";
+
+  const labels = {
+    go: { busy: "Processing registration…", status: "msg" },
+    unlock: { busy: "Checking credentials…", status: "pwm" },
+    fgo: { busy: "Searching members…", status: "fmsg" },
+    fsum: { busy: "Preparing summary…", status: "fmsg" },
+    fexp: { busy: "Preparing CSV…", status: "fmsg" },
+    faud: { busy: "Loading audit log…", status: "fmsg" },
+    flo: { busy: "Signing out…", status: "fmsg" },
+    dl: { busy: "Preparing PDF…", status: "msg" },
+    wa: { busy: "Opening WhatsApp…", status: "msg" }
+  };
+
+  const spinner = '<span class="portal-action-spinner" aria-hidden="true"></span>';
+  const style = document.createElement("style");
+  style.textContent = [
+    ".portal-action-spinner{display:inline-block;width:15px;height:15px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-3px;margin-right:9px;animation:portalActionSpin .7s linear infinite}",
+    "@keyframes portalActionSpin{to{transform:rotate(360deg)}}",
+    ".btn[aria-busy=true]{cursor:wait!important;opacity:.88;filter:saturate(.82)}",
+    ".btn:disabled{cursor:wait}",
+    ".portal-action-status{min-height:1.4em}",
+    "@media(prefers-reduced-motion:reduce){.portal-action-spinner{animation:none;border-right-color:currentColor}}"
+  ].join("");
+  document.head.appendChild(style);
+
+  function setLiveStatus(id, message) {
+    const node = id && document.getElementById(id);
+    if (!node) return;
+    node.setAttribute("role", "status");
+    node.setAttribute("aria-live", "polite");
+    if (message) node.textContent = message;
+  }
+
+  function getBusyLabel(button) {
+    const custom = labels[button.id];
+    if (custom) return custom.busy;
+    const label = (button.textContent || "").trim();
+    if (/load more/i.test(label)) return "Loading more…";
+    if (/^view$/i.test(label)) return "Loading record…";
+    if (/^pdf$/i.test(label)) return "Preparing PDF…";
+    if (/^manage$/i.test(label)) return "Opening controls…";
+    if (/approve|reject|pending|save district|change selected field|delete record/i.test(label)) return "Saving changes…";
+    return "Please wait…";
+  }
+
+  function enhanceButton(button) {
+    if (!button || button.dataset.portalBusyWrapped === "true") return;
+    if (!button.matches(".btn, #unlock, #fgo, #fsum, #fexp, #faud, #flo, #go, #dl, #wa, .more")) return;
+    if (typeof button.onclick !== "function") return;
+
+    const original = button.onclick;
+    const originalHTML = button.innerHTML;
+    button.dataset.portalBusyWrapped = "true";
+    button.onclick = async function (event) {
+      if (button.dataset.portalActionRunning === "true" || button.disabled) {
+        if (event && event.preventDefault) event.preventDefault();
+        return;
+      }
+
+      const config = labels[button.id] || {};
+      const statusId = config.status || (document.getElementById("fmsg") ? "fmsg" : "");
+      const wasDisabled = button.disabled;
+      const wasHTML = button.innerHTML;
+      button.dataset.portalActionRunning = "true";
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      button.setAttribute("aria-disabled", "true");
+      button.innerHTML = spinner + getBusyLabel(button);
+
+      if (statusId && button.id !== "go") {
+        setLiveStatus(statusId, getBusyLabel(button));
+      }
+
+      try {
+        // Invoke synchronously inside the real click gesture so popup/share actions
+        // such as WhatsApp are not broken by the loading wrapper.
+        const result = original.call(this, event);
+        if (result && typeof result.then === "function") await result;
+      } catch (error) {
+        console.error("[NPCIH-A] Button action failed:", button.id || button.textContent.trim(), error);
+        if (statusId) setLiveStatus(statusId, "The action could not be completed. Please try again.");
+      } finally {
+        button.innerHTML = originalHTML || wasHTML;
+        button.disabled = wasDisabled;
+        button.removeAttribute("aria-busy");
+        button.removeAttribute("aria-disabled");
+        delete button.dataset.portalActionRunning;
+      }
+    };
+  }
+
+  function scan(root) {
+    if (!root) return;
+    if (root.nodeType === 1) enhanceButton(root);
+    if (root.querySelectorAll) root.querySelectorAll("button").forEach(enhanceButton);
+  }
+
+  function boot() {
+    scan(document);
+    // Admin rows and their action buttons are created dynamically after API responses.
+    if ("MutationObserver" in window) {
+      const observer = new MutationObserver(function (records) {
+        records.forEach(function (record) {
+          record.addedNodes.forEach(function (node) {
+            if (node.nodeType === 1) scan(node);
+          });
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // Make the existing message areas accessible to screen readers.
+    ["msg", "pwm", "fmsg", "ps"].forEach(function (id) {
+      const node = document.getElementById(id);
+      if (node) {
+        node.setAttribute("role", "status");
+        node.setAttribute("aria-live", "polite");
+        node.setAttribute("aria-atomic", "true");
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else {
+    boot();
+  }
+})();
