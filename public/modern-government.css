@@ -436,3 +436,19 @@ html.portal-motion-ready .portal-section-heading[data-motion-reveal].motion-visi
   html.portal-motion-ready [data-motion-reveal] { opacity:1!important; transform:none!important; }
   .portal-motion-orb,.portal-scroll-progress { display:none!important; }
 }
+
+.portal-admin-intro {
+  transform:perspective(1000px) rotateX(var(--motion-tilt-x,0deg)) rotateY(var(--motion-tilt-y,0deg));
+  transform-origin:center center;
+}
+#list > div:not(.msg) {
+  transform:perspective(1000px) rotateX(var(--motion-tilt-x,0deg)) rotateY(var(--motion-tilt-y,0deg));
+  transform-origin:center center;
+}
+.portal-message-enter { animation:portal-eyebrow-in .35s var(--motion-ease) both; }
+@media(max-width:640px) {
+  #list > div:not(.msg) { transform:none!important; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .portal-admin-intro,#list > div:not(.msg) { transform:none!important; }
+}
