@@ -193,3 +193,100 @@
     bootMotion();
   }
 })();
+
+
+/* Premium 3D hero: presentation-only, keeping the existing registration and admin flows intact. */
+(function () {
+  "use strict";
+
+  function addPremiumHero() {
+    const main = document.querySelector("main");
+    const formCard = document.getElementById("v1");
+    if (!main || !formCard || document.getElementById("portal-hero-3d")) return;
+
+    const mapSvg = '<svg class="portal-globe-map-piece" viewBox="0 0 400 400" role="presentation" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><g>' +
+      '<path d="M49 94 70 79 91 83 103 72 127 83 143 101 131 115 116 119 107 137 91 145 82 163 63 155 58 136 45 123 40 106Z"/>' +
+      '<path d="M122 177 144 171 158 187 163 209 153 235 147 265 135 289 124 267 117 238 112 216 115 194Z"/>' +
+      '<path d="M187 104 203 91 218 98 224 110 241 112 244 125 229 133 220 146 211 161 199 151 194 135 180 124Z"/>' +
+      '<path d="M201 158 220 151 236 165 242 190 235 216 224 241 209 255 198 231 193 207 184 187 189 170Z"/>' +
+      '<path d="M232 99 256 79 283 83 303 96 331 101 347 119 333 134 311 130 301 148 281 151 269 137 247 139 237 121Z"/>' +
+      '<path d="M303 161 323 156 340 169 335 187 320 195 310 184Z"/>' +
+      '<path d="M62 66 81 54 101 60 108 70 94 82 76 80Z"/>' +
+      '</g></svg>';
+
+    const hero = document.createElement("section");
+    hero.id = "portal-hero-3d";
+    hero.className = "portal-hero-3d";
+    hero.setAttribute("aria-labelledby", "portal-hero-title");
+    hero.innerHTML =
+      '<div class="portal-hero-copy">' +
+        '<div class="portal-hero-eyebrow">NPCIH-A &nbsp;•&nbsp; DIGITAL COMMAND PORTAL</div>' +
+        '<h2 class="portal-hero-title" id="portal-hero-title">INTELLIGENCE.<br><span>INNOVATION.</span><br><em>INTEGRITY.</em></h2>' +
+        '<p class="portal-hero-description">A modern platform for membership registration, trusted information management, and professional institutional coordination.</p>' +
+        '<div class="portal-hero-actions">' +
+          '<a class="portal-hero-cta" href="#v1">Explore Platform <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>' +
+          '<button class="portal-hero-cta secondary" type="button" data-portal-admin-access>Access Dashboard <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>' +
+        '</div>' +
+        '<div class="portal-hero-proof">' +
+          '<span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Validated submissions</span>' +
+          '<span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 19 6v5c0 4.7-3.1 7.8-7 10-3.9-2.2-7-5.3-7-10V6l7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Role-aware access</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="portal-hero-visual" aria-hidden="true">' +
+        '<div class="portal-globe-aura"></div>' +
+        '<div class="portal-globe-orbit orbit-one"></div>' +
+        '<div class="portal-globe-orbit orbit-two"></div>' +
+        '<div class="portal-globe-orbit orbit-three"></div>' +
+        '<div class="portal-globe">' +
+          '<div class="portal-globe-map">' + mapSvg + mapSvg + '</div>' +
+          '<svg class="portal-globe-graticule" viewBox="0 0 400 400" preserveAspectRatio="none"><ellipse cx="200" cy="200" rx="174" ry="174"/><ellipse cx="200" cy="200" rx="100" ry="174"/><ellipse cx="200" cy="200" rx="42" ry="174"/><ellipse cx="200" cy="200" rx="174" ry="75"/><ellipse cx="200" cy="200" rx="174" ry="125"/><path d="M26 200h348M200 26v348"/></svg>' +
+          '<div class="portal-globe-shine"></div><div class="portal-globe-pin"></div>' +
+        '</div>' +
+        '<div class="portal-globe-label label-left"><span class="label-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M7 4v6m10-6v6M5 12h14v8H5z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>MEMBERSHIP RECORDS<small>Validated submission flow</small></span></div>' +
+        '<div class="portal-globe-label label-right"><span class="label-icon gold"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 19 6v5c0 4.7-3.1 7.8-7 10-3.9-2.2-7-5.3-7-10V6l7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>ACCESS CONTROL<small>Role-based administration</small></span></div>' +
+        '<div class="portal-globe-caption">PRECISION · TRUST · COORDINATION</div>' +
+      '</div>';
+
+    formCard.insertAdjacentElement("beforebegin", hero);
+
+    const adminAccess = hero.querySelector("[data-portal-admin-access]");
+    if (adminAccess) {
+      adminAccess.addEventListener("click", function () {
+        const adminToggle = document.querySelector(".fab");
+        if (adminToggle) {
+          adminToggle.click();
+        } else {
+          const adminPanel = document.getElementById("v2");
+          if (adminPanel) adminPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    }
+
+    const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const finePointer = window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const visual = hero.querySelector(".portal-hero-visual");
+    if (visual && finePointer && !reducedMotion) {
+      visual.addEventListener("pointermove", function (event) {
+        if (event.pointerType !== "mouse") return;
+        const rect = visual.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const x = (event.clientX - rect.left) / rect.width - 0.5;
+        const y = (event.clientY - rect.top) / rect.height - 0.5;
+        visual.style.setProperty("--hero-tilt-x", (-y * 2.8).toFixed(2) + "deg");
+        visual.style.setProperty("--hero-tilt-y", (x * 3.2).toFixed(2) + "deg");
+      }, { passive: true });
+      visual.addEventListener("pointerleave", function () {
+        visual.style.setProperty("--hero-tilt-x", "0deg");
+        visual.style.setProperty("--hero-tilt-y", "0deg");
+      }, { passive: true });
+    }
+
+    document.documentElement.classList.add("portal-hero-ready");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", addPremiumHero, { once: true });
+  } else {
+    addPremiumHero();
+  }
+})();
