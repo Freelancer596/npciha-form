@@ -652,6 +652,14 @@
         // Invoke synchronously inside the real click gesture so popup/share actions
         // such as WhatsApp are not broken by the loading wrapper.
         const result = original.call(this, event);
+        // Some existing handlers clear their message area before awaiting the network.
+        // Refill it with a live status immediately if it is still empty.
+        if (statusId && button.id !== "go") {
+          const statusNode = document.getElementById(statusId);
+          if (statusNode && !statusNode.textContent.trim()) {
+            setLiveStatus(statusId, getBusyLabel(button));
+          }
+        }
         if (result && typeof result.then === "function") await result;
       } catch (error) {
         console.error("[NPCIH-A] Button action failed:", button.id || button.textContent.trim(), error);
