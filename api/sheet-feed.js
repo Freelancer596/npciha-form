@@ -47,7 +47,8 @@ module.exports = async (req, res) => {
     }
     const head = HEADERS.map((x, i) => i === 16 ? 'District' : i === 15 ? 'Province ID' : x);
     const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
-    const lines = [head.map(cell).join(',')];
+    // header=0 -> data rows only (use when the sheet already has its own header row 1)
+    const lines = String((req.query && req.query.header) || '') === '0' ? [] : [head.map(cell).join(',')];
     for (const m of rows) {
       lines.push([m.ref_no, karachiDate(m.created_at), m.name, m.father_name, m.cnic, m.dob, m.religion, m.education, m.designation, m.wing,
         m.residence_address, m.office_address, m.profession, phone(m.contact), m.email, m.province_id, dn.get(m.district_id) || m.district_id, m.taluka_name, cap(m.status)].map(cell).join(','));

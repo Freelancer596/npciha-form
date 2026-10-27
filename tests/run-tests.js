@@ -253,6 +253,7 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('GET', '/api/sheet-feed?key=wrong-wrong-wrong-wrong-wrong'); ok('sheet-feed: wrong key -> 404', r.s === 404);
   r = await call('GET', '/api/sheet-feed?key=feed-token-feed-token-feed-token-1');
   ok('sheet-feed: right key -> CSV with header + all members, formula text neutralised', r.s === 200 && /text\/csv/.test(r.h.get('content-type')) && r.text.startsWith('"Reference No","Application Date"') && r.text.split('\r\n').length >= 3 && !/,"=1\+1"/.test(r.text));
+  r = await call('GET', '/api/sheet-feed?header=0&key=feed-token-feed-token-feed-token-1'); ok('sheet-feed: header=0 returns data rows only', r.s === 200 && !r.text.includes('Reference No'));
   delete process.env.SHEET_FEED_TOKEN;
   // ---- Send existing members to Google Sheet (Apps Script webhook) ----
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } }); ok('sheetsync: not configured -> 409', r.s === 409);
