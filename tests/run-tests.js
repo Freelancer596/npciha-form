@@ -246,6 +246,12 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   const rawCsv = Buffer.from(await (await fetch(BASE + '/api/admin/export?district_id=1', { headers: { Cookie: S.cookie, 'X-Requested-With': 'npciha' } })).arrayBuffer());
   ok('CSV export for authorised admin (UTF-8 BOM, attachment, filtered)', r.s === 200 && rawCsv[0] === 0xEF && rawCsv[1] === 0xBB && rawCsv[2] === 0xBF && /attachment/.test(r.h.get('content-disposition')) && r.text.includes('Ali Raza') && !r.text.includes('Dilip Kumar'));
   r = await call('GET', '/api/admin/export', { admin: true, cookie: S.cookie }); ok("CSV neutralises formula injection ('=1+1' -> \"'=1+1\")", r.text.includes("'=1+1") && !/,=1\+1,/.test(r.text));
+  // ---- Optional admin Access Code ----
+  process.env.ADMIN_ACCESS_CODE = 'Code-1234-test';
+  r = await call('POST', '/api/admin/login', { body: { username: 'boss', password: PW }, admin: true }); ok('access code set: login without code refused, asks for code', r.s === 401 && r.j.error === 'access_code_required' && !r.cookie);
+  r = await call('POST', '/api/admin/login', { body: { username: 'boss', password: PW, access_code: 'wrong' }, admin: true }); ok('access code set: wrong code refused (generic 401, no session)', r.s === 401 && r.j.error === 'invalid_credentials' && !r.cookie);
+  r = await call('POST', '/api/admin/login', { body: { username: 'boss', password: PW, access_code: 'Code-1234-test' }, admin: true }); ok('access code set: correct password + code logs in', r.s === 200 && r.j.ok && !!r.cookie);
+  delete process.env.ADMIN_ACCESS_CODE;
   // ---- Send existing members to Google Sheet (Apps Script webhook) ----
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } }); ok('sheetsync: not configured -> 409', r.s === 409);
   process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/TEST/exec'; process.env.GOOGLE_SHEETS_WEBHOOK_SECRET = 'test-secret';

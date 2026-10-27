@@ -1,6 +1,7 @@
 'use strict';
 // All administrator endpoints live in this single function (keeps the project within Vercel's
 // free-plan function limit):  /api/admin/<action>
+const crypto = require('crypto');
 const sb = require('../../lib/sb');
 const { MAX_BODY, secHeaders, send, sendError, sameOrigin, readJson, handleError, ipHash } = require('../../lib/http');
 const A = require('../../lib/auth');
@@ -69,11 +70,20 @@ H.login = async (req, res) => {
   const password = typeof b.password === 'string' ? b.password.slice(0, 200) : '';
   const generic = () => sendError(res, 401, 'invalid_credentials', 'Invalid username or password, or the account is temporarily locked.');
   if (!username || !password) return generic();
+  // Optional extra lock: when ADMIN_ACCESS_CODE is set in Vercel, the login also needs this code.
+  const need = (process.env.ADMIN_ACCESS_CODE || '').trim();
+  let codeOk = true;
+  if (need) {
+    const given = typeof b.access_code === 'string' ? b.access_code.trim().slice(0, 100) : '';
+    if (!given) return sendError(res, 401, 'access_code_required', 'Access Code is required. / ایکسس کوڈ لکھیں۔');
+    const h = x => crypto.createHash('sha256').update(x).digest();
+    codeOk = crypto.timingSafeEqual(h(given), h(need));
+  }
 
   const { data: a } = await sb.select('admins', [['username', 'eq.' + username], ['select', 'id,username,full_name,role,district_id,active,password_hash,failed_attempts,locked_until'], ['limit', '1']], { single: true });
   const locked = a && a.locked_until && new Date(a.locked_until) > new Date();
   const ok = await A.verifyPassword(password, a ? a.password_hash : A.DUMMY);
-  if (!a || !a.active || locked || !ok) {
+  if (!a || !a.active || locked || !ok || !codeOk) {
     if (a && a.active && !locked) {
       const fails = (a.failed_attempts || 0) + 1;
       const patch = fails >= A.MAX_FAILS ? { failed_attempts: 0, locked_until: new Date(Date.now() + A.LOCK_MINUTES * 60000).toISOString() } : { failed_attempts: fails };
