@@ -142,7 +142,7 @@ $("go").onclick=async()=>{const f=$("f");if(!f.reportValidity())return;if(!$("pv
  const was=R.j.duplicate_submission?" (already saved earlier; showing the saved record)":"";
  try{$("msg").textContent="Saved. Creating PDF…";const d=await pdf(m);last=d;await save(last,m);$("msg").textContent="Registration saved. Ref: "+m.ref+". PDF ready."+was;$("done").classList.remove("hide");last.m=m}catch(e){$("msg").textContent="Registration saved (Ref: "+m.ref+") but the PDF could not be created: "+e.message+". Tap Submit again to retry the PDF."}$("go").disabled=false};
 $("dl").onclick=()=>save(last,last.m);
-function whatsappUrl(m){return "https://wa.me/923336305884?text="+encodeURIComponent("New Membership Application\nName: "+m.name+"\nApplication No: "+m.ref)}
+function whatsappUrl(m){return "https://wa.me/923337312086?text="+encodeURIComponent("New Membership Application\nName: "+m.name+"\nApplication No: "+m.ref)}
 $("wa").onclick=()=>{if(!last||!last.m)return;window.open(whatsappUrl(last.m),"_blank")};
 $("t2").onclick=()=>{tab(2);scrollTo(0,0);if(!ME)enter()};$("back").onclick=()=>{tab(1);scrollTo(0,0)};
 function tab(n){$("v1").classList.toggle("hide",n!=1);$("v2").classList.toggle("hide",n!=2);$("t2").classList.toggle("hide",n==2)}

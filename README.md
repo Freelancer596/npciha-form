@@ -145,7 +145,7 @@ See `docs/CHANGES.md` and `docs/TEST-REPORT.md` for exactly what changed and wha
 
 ## WhatsApp and PDF behavior (configured)
 - Membership PDF is generated as exactly two pages: page 1 is the completed form; page 2 is the member photo with name and application number.
-- The Share on WhatsApp button opens the administrator chat at `923336305884` and pre-fills only the member name and application number. The member must press Send. The PDF is not attached to WhatsApp.
+- The Share on WhatsApp button opens the administrator chat at `923337312086` and pre-fills only the member name and application number. The member must press Send. The PDF is not attached to WhatsApp.
 - The application must first be saved successfully by the backend before the WhatsApp action becomes available.
 
 ## Optional: mirror new applications to Google Sheets
