@@ -7,6 +7,11 @@ function out(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// Open the Web app URL in a browser: you should see {"ok":true,"status":"alive"} (no login page).
+function doGet() {
+  return out({ ok: true, status: 'alive' });
+}
+
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
