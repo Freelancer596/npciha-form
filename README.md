@@ -165,3 +165,11 @@ Supabase remains the authoritative database. When configured, each newly submitt
 
 The sheet includes application reference/date, applicant details and location IDs/taluka. It does not copy the uploaded photo. The spreadsheet contains personal information such as CNIC, so keep sharing restricted to authorized staff only. If the sync fails, the registration still remains saved in Supabase; check Vercel Function Logs for a `Google Sheets sync failed` message.
 
+
+
+## Google Sheets via Apps Script (no private key needed)
+
+1. Open the Google Sheet > Extensions > Apps Script. Delete the sample code and paste `docs/google-apps-script.gs`. Put your own long random secret in `SECRET`.
+2. Deploy > New deployment > type **Web app** > Execute as **Me** > Who has access **Anyone** > Deploy. Authorize when asked. Copy the Web app URL (ends with `/exec`).
+3. In Vercel > Settings > Environment Variables (Production) add `GOOGLE_SHEETS_WEBHOOK_URL` (that URL) and `GOOGLE_SHEETS_WEBHOOK_SECRET` (the same secret). Redeploy.
+4. Every new registration is then appended to the "Applications" tab automatically. A Sheets failure never blocks the saved registration.
