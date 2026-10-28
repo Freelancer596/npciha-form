@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ['pending', 'approved', 'rejected'];
 const LIST_COLS = 'id,ref_no,name,cnic,contact,district_id,taluka_id,status,created_at';
 const FULL_COLS = 'id,ref_no,name,father_name,cnic,dob,religion,education,designation,wing,residence_address,office_address,profession,contact,email,photo_path,district_id,taluka_id,status,status_note,reviewed_by,reviewed_at,created_at,updated_at';
-const EXPORT_MAX = 5000;
+const EXPORT_MAX = 20000;
 const DENIED = (res, msg) => sendError(res, 403, 'access_denied', msg || 'You do not have permission to do this.');
 
 // ---------- helpers ----------

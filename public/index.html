@@ -116,7 +116,7 @@ async function pdf(m){const c=await drawForm(m); const J=window.jspdf.jsPDF,d=ne
 async function save(d,m){const u=d.output("datauristring").split(",")[1],dl=await claude.use("downloads");const fn="NPCIHA-"+m.name.replace(/\W+/g,"_")+".pdf";
  if(dl){try{await dl.save({filename:fn,data:u});return}catch(e){}}d.save(fn)}
 async function shrink(f){let i;try{i=await createImageBitmap(f,{imageOrientation:"from-image"})}catch(e){const u=URL.createObjectURL(f);try{i=await ld(u)}catch(e2){i=await ld(await rd(f))}}
- const W=420,H=540,c=document.createElement("canvas");c.width=W;c.height=H;const s=Math.max(W/i.width,H/i.height),w=i.width*s,h=i.height*s;c.getContext("2d").drawImage(i,(W-w)/2,(H-h)/2,w,h);return c.toDataURL("image/jpeg",.85)}
+ const W=420,H=540,c=document.createElement("canvas");c.width=W;c.height=H;const s=Math.max(W/i.width,H/i.height),w=i.width*s,h=i.height*s;c.getContext("2d").drawImage(i,(W-w)/2,(H-h)/2,w,h);return c.toDataURL("image/jpeg",.78)}
 async function pick(e){const f=e.target.files&&e.target.files[0];if(!f){$("ps").textContent="No photo chosen.";return}
  $("ps").textContent="Selected: "+f.name+" ("+Math.round(f.size/1024)+" KB). Processing…";
  if(f.type&&!/^image\/(jpeg|png|webp|gif|heic|heif)$/i.test(f.type)||f.size>25*1048576){$("pv").removeAttribute("src");$("pv").style.display="none";$("ps").style.color="#b00020";$("ps").textContent="Please choose a JPG, PNG or WebP photo under 25 MB.";return}
