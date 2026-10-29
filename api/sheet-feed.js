@@ -4,7 +4,7 @@
 const crypto = require('crypto');
 const sb = require('../lib/sb');
 const { secHeaders, sendError, handleError } = require('../lib/http');
-const { HEADERS } = require('../lib/google-sheets');
+const { HEADERS, capLevel } = require('../lib/google-sheets');
 
 const MAX_ROWS = 20000;
 const h = x => crypto.createHash('sha256').update(String(x)).digest();
@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
     const lines = String((req.query && req.query.header) || '') === '0' ? [] : [head.map(cell).join(',')];
     for (const m of rows) {
       lines.push([m.ref_no, karachiDate(m.created_at), m.name, m.father_name, m.cnic, m.dob, m.religion, m.education, m.designation, m.wing,
-        m.residence_address, m.office_address, m.profession, phone(m.contact), m.email, m.province_id, dn.get(m.district_id) || m.district_id, m.taluka_name, cap(m.status), '', m.office_level, m.office_area].map(cell).join(','));
+        m.residence_address, m.office_address, m.profession, phone(m.contact), m.email, m.province_id, dn.get(m.district_id) || m.district_id, m.taluka_name, cap(m.status), '', capLevel(m.office_level), m.office_area].map(cell).join(','));
     }
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
