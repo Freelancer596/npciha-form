@@ -261,7 +261,7 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   const realFetch = global.fetch; let hook = null;
   global.fetch = async (u, o) => { if (String(u).startsWith('https://script.google.com/')) { hook = JSON.parse(o.body); return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, added: hook.rows.length, skipped: 0 }) }; } return realFetch(u, o); };
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } });
-  ok('sheetsync: super admin sends all members in one batch, 19 columns, secret included', r.s === 200 && r.j.ok && r.j.done === true && r.j.sent === hook.rows.length && hook.rows[0].length === 19 && hook.secret === 'test-secret');
+  ok('sheetsync: super admin sends all members in one batch, 22 columns, secret included', r.s === 200 && r.j.ok && r.j.done === true && r.j.sent === hook.rows.length && hook.rows[0].length === 22 && hook.secret === 'test-secret');
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: HA.cookie, body: { offset: 0 } }); ok('sheetsync: district admin refused (403)', r.s === 403);
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: DE.cookie, body: { offset: 0 } }); ok('sheetsync: data entry refused (403)', r.s === 403);
   global.fetch = realFetch; delete process.env.GOOGLE_SHEETS_WEBHOOK_URL; delete process.env.GOOGLE_SHEETS_WEBHOOK_SECRET;
@@ -318,6 +318,20 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('district without a taluka typed -> saved with taluka_name null', r.s === 201);
   const dm2 = (await dump()).t.members.find(m => m.cnic === '42101-7000002-1');
   ok('row stores taluka_name=null when left empty', dm2 && dm2.taluka_name === null && dm2.district_id === 4);
+
+  // ---- office level / area (District / Taluka / City <post>) ----
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100001-1', designation: 'Taluka Media Adviser', office_level: 'taluka', office_area: 'Kandhkot', taluka_name: 'Kandhkot' }) });
+  ok('office level + area accepted (201)', r.s === 201, r.text.slice(0, 160));
+  const om = (await dump()).t.members.find(m => m.cnic === '42101-7100001-1');
+  ok('stored row keeps designation, office_level=taluka and office_area=Kandhkot', om && om.designation === 'Taluka Media Adviser' && om.office_level === 'taluka' && om.office_area === 'Kandhkot', JSON.stringify(om && [om.designation, om.office_level, om.office_area]));
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100002-1', designation: 'Member', office_level: 'member', office_area: 'Ignored' }) });
+  const om2 = (await dump()).t.members.find(m => m.cnic === '42101-7100002-1');
+  ok('member level saves with an empty area', r.s === 201 && om2 && om2.office_level === 'member' && om2.office_area === null, JSON.stringify(om2 && [om2.office_level, om2.office_area]));
+  await bad('office level not in the list', { cnic: '42101-7100003-1', office_level: 'galaxy', office_area: 'X' }, 'office_level');
+  await bad('district-level post without an area', { cnic: '42101-7100004-1', office_level: 'district', office_area: '' }, 'office_area');
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100005-1' }) });
+  const om3 = (await dump()).t.members.find(m => m.cnic === '42101-7100005-1');
+  ok('older form without level/area still saves (both null)', r.s === 201 && om3 && om3.office_level === null && om3.office_area === null);
 
   // ---- secrets scan ----
   const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(path.join(dir, e.name))) : [path.join(dir, e.name)]);

@@ -9,7 +9,7 @@ const { validateEdit, maskCnic, normCnic } = require('../../lib/validate');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ['pending', 'approved', 'rejected'];
 const LIST_COLS = 'id,ref_no,name,cnic,contact,district_id,taluka_id,status,created_at';
-const FULL_COLS = 'id,ref_no,name,father_name,cnic,dob,religion,education,designation,wing,residence_address,office_address,profession,contact,email,photo_path,district_id,taluka_id,status,status_note,reviewed_by,reviewed_at,created_at,updated_at';
+const FULL_COLS = 'id,ref_no,name,father_name,cnic,dob,religion,education,designation,office_level,office_area,wing,residence_address,office_address,profession,contact,email,photo_path,district_id,taluka_id,status,status_note,reviewed_by,reviewed_at,created_at,updated_at';
 const EXPORT_MAX = 20000;
 const DENIED = (res, msg) => sendError(res, 403, 'access_denied', msg || 'You do not have permission to do this.');
 
@@ -212,10 +212,10 @@ H.export = async (req, res, admin) => {
     const r = await sb.select('members', [...filters, ['select', FULL_COLS.replace('photo_path,', '')], ['order', 'created_at.asc'], ['limit', '1000'], ['offset', String(off)]]);
     rows.push(...r.data); if (r.data.length < 1000) break; off += 1000;
   }
-  const head = ['Reference No', 'Name', 'Father Name', 'CNIC', 'Date of Birth', 'Religion', 'Education', 'Designation', 'Wing', 'Residence Address', 'Office Address', 'Profession', 'Contact', 'Email', 'District', 'Taluka', 'Status', 'Registered'];
+  const head = ['Reference No', 'Name', 'Father Name', 'CNIC', 'Date of Birth', 'Religion', 'Education', 'Designation', 'Office Level', 'Office Area', 'Wing', 'Residence Address', 'Office Address', 'Profession', 'Contact', 'Email', 'District', 'Taluka', 'Status', 'Registered'];
   const lines = [head.join(',')];
   for (const m of rows.slice(0, EXPORT_MAX)) {
-    lines.push([m.ref_no, m.name, m.father_name, shapeRow(admin, m).cnic, m.dob, m.religion, m.education, m.designation, m.wing, m.residence_address, m.office_address, m.profession, m.contact, m.email, dn.get(m.district_id) || '', tn.get(m.taluka_id) || '', m.status, m.created_at].map(csvCell).join(','));
+    lines.push([m.ref_no, m.name, m.father_name, shapeRow(admin, m).cnic, m.dob, m.religion, m.education, m.designation, m.office_level, m.office_area, m.wing, m.residence_address, m.office_address, m.profession, m.contact, m.email, dn.get(m.district_id) || '', tn.get(m.taluka_id) || '', m.status, m.created_at].map(csvCell).join(','));
   }
   await A.audit(req, admin, 'export_csv', 'members', null, { rows: Math.min(rows.length, EXPORT_MAX), filters: Object.fromEntries(['district_id', 'taluka_id', 'status', 'date_from', 'date_to'].filter(k => req.query[k]).map(k => [k, req.query[k]])) });
   res.statusCode = 200;
@@ -232,10 +232,10 @@ H.sheetsync = async (req, res, admin) => {
   }
   const body = await readJson(req, 2000).catch(() => ({}));
   const offset = int(body && body.offset, 0, 0, 1000000), BATCH = 80;
-  const r = await sb.select('members', [['select', 'ref_no,created_at,name,father_name,cnic,dob,religion,education,designation,wing,residence_address,office_address,profession,contact,email,province_id,district_id,taluka_name,status'], ['order', 'created_at.asc'], ['limit', String(BATCH)], ['offset', String(offset)]]);
+  const r = await sb.select('members', [['select', 'ref_no,created_at,name,father_name,cnic,dob,religion,education,designation,office_level,office_area,wing,residence_address,office_address,profession,contact,email,province_id,district_id,taluka_name,status'], ['order', 'created_at.asc'], ['limit', String(BATCH)], ['offset', String(offset)]]);
   const fmtDate = iso => { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'numeric', year: 'numeric' }).formatToParts(new Date(iso)); const g = t => p.find(x => x.type === t).value; return +g('day') + '-' + +g('month') + '-' + g('year'); };
   const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
-  const rows = r.data.map(m => [m.ref_no || '', fmtDate(m.created_at), m.name || '', m.father_name || '', m.cnic || '', m.dob || '', m.religion || '', m.education || '', m.designation || '', m.wing || '', m.residence_address || '', m.office_address || '', m.profession || '', m.contact || '', m.email || '', m.province_id || '', m.district_id || '', m.taluka_name || '', cap(m.status)]);
+  const rows = r.data.map(m => [m.ref_no || '', fmtDate(m.created_at), m.name || '', m.father_name || '', m.cnic || '', m.dob || '', m.religion || '', m.education || '', m.designation || '', m.wing || '', m.residence_address || '', m.office_address || '', m.profession || '', m.contact || '', m.email || '', m.province_id || '', m.district_id || '', m.taluka_name || '', cap(m.status), '', m.office_level || '', m.office_area || '']);
   let out = { added: 0, skipped: 0 };
   if (rows.length) {
     const { appendBatchViaWebhook } = require('../../lib/google-sheets');
