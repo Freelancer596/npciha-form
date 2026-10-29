@@ -19,13 +19,14 @@ function publicMember(v, row) {
   return {
     ref: row.ref_no, date: karachiDate(row.created_at), name: v.name, father: v.father_name, cnic: v.cnic, dob: v.dob,
     religion: v.religion, education: v.education || '', designation: v.designation, wing: v.wing,
+    office_level: v.office_level || '', office_area: v.office_area || '',
     res: v.residence_address, off: v.office_address || '', prof: v.profession || '', contact: v.contact, email: v.email || '',
   };
 }
 
-const STORED = 'ref_no,created_at,cnic,name,father_name,dob,religion,education,designation,wing,residence_address,office_address,profession,contact,email';
+const STORED = 'ref_no,created_at,cnic,name,father_name,dob,religion,education,designation,office_level,office_area,wing,residence_address,office_address,profession,contact,email';
 function fromStored(r) {
-  return publicMember({ name: r.name, father_name: r.father_name, cnic: r.cnic, dob: r.dob, religion: r.religion, education: r.education, designation: r.designation, wing: r.wing, residence_address: r.residence_address, office_address: r.office_address, profession: r.profession, contact: r.contact, email: r.email }, r);
+  return publicMember({ name: r.name, father_name: r.father_name, cnic: r.cnic, dob: r.dob, religion: r.religion, education: r.education, designation: r.designation, office_level: r.office_level, office_area: r.office_area, wing: r.wing, residence_address: r.residence_address, office_address: r.office_address, profession: r.profession, contact: r.contact, email: r.email }, r);
 }
 
 module.exports = async (req, res) => {
@@ -72,7 +73,8 @@ module.exports = async (req, res) => {
     try {
       const out = await sb.insert('members', {
         id, submission_token: v.submission_token, name: v.name, father_name: v.father_name, cnic: v.cnic, dob: v.dob,
-        religion: v.religion, education: v.education || null, designation: v.designation, wing: v.wing,
+        religion: v.religion, education: v.education || null, designation: v.designation,
+        office_level: v.office_level || null, office_area: v.office_area || null, wing: v.wing,
         residence_address: v.residence_address, office_address: v.office_address || null, profession: v.profession || null,
         contact: v.contact, email: v.email || null, photo_path: photoPath,
         province_id: loc.value.province_id, district_id: loc.value.district_id, taluka_name: loc.value.taluka_name,
