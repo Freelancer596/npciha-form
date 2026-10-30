@@ -265,6 +265,34 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: HA.cookie, body: { offset: 0 } }); ok('sheetsync: district admin refused (403)', r.s === 403);
   r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: DE.cookie, body: { offset: 0 } }); ok('sheetsync: data entry refused (403)', r.s === 403);
   global.fetch = realFetch; delete process.env.GOOGLE_SHEETS_WEBHOOK_URL; delete process.env.GOOGLE_SHEETS_WEBHOOK_SECRET;
+  // ---- sheet sync button through the direct Sheets API (no Apps Script) ----
+  {
+    const { newRowsOnly } = require('../lib/google-sheets');
+    const rowsIn = [['0001'], ['0002'], ['0002'], [''], ['0003']];
+    ok('newRowsOnly skips refs already in the sheet, blanks and duplicates', JSON.stringify(newRowsOnly(['Reference No', '0001', ' '], rowsIn)) === JSON.stringify([['0002'], ['0003']]));
+    const { privateKey } = require('crypto').generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID = 'sheet-test-id';
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: 'svc@test-proj.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }) });
+    const realFetch2 = global.fetch; let appended = null, mode = 'ok', firstRef = null;
+    global.fetch = async (u, o) => {
+      u = String(u);
+      if (u.startsWith('https://oauth2.googleapis.com/')) return { ok: true, status: 200, json: async () => ({ access_token: 't', expires_in: 3600 }) };
+      if (u.startsWith('https://sheets.googleapis.com/')) {
+        if (mode === 'denied') return { ok: false, status: 403, json: async () => ({}) };
+        if (o && o.method === 'POST') { appended = JSON.parse(o.body).values; return { ok: true, status: 200, json: async () => ({}) }; }
+        return { ok: true, status: 200, json: async () => ({ values: [['Reference No'], [firstRef]] }) };
+      }
+      return realFetch2(u, o);
+    };
+    const all = (await dump()).t.members.map(m => m.ref_no); firstRef = all[0];
+    r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } });
+    ok('sheetsync direct API: sends only refs missing from the sheet', r.s === 200 && r.j.ok && appended && appended.length === all.length - 1 && r.j.added === all.length - 1 && r.j.skipped === 1 && appended.every(x => x.length === 22 && x[0] !== firstRef), r.text.slice(0, 200));
+    ok('sheetsync direct API: province and district written as names, not ids', appended && appended.every(x => typeof x[15] === 'string' && typeof x[16] === 'string'), JSON.stringify(appended && appended[0] && [appended[0][15], appended[0][16]]));
+    mode = 'denied';
+    r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } });
+    ok('sheetsync direct API: 403 tells the admin which e-mail to share the sheet with', r.s === 502 && /svc@test-proj\.iam\.gserviceaccount\.com/.test(r.text) && /Editor/.test(r.text), r.text.slice(0, 220));
+    global.fetch = realFetch2; delete process.env.GOOGLE_SHEETS_SPREADSHEET_ID; delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  }
   r = await call('GET', '/api/admin/export', { admin: true, cookie: HA.cookie }); ok("district admin CSV contains only own district's rows", r.s === 200 && !r.text.includes('Dilip Kumar') && !r.text.includes('Mary John'));
 
   // ---- delete with confirmation, audit ----
