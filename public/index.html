@@ -102,8 +102,9 @@ nav button.on{background:linear-gradient(180deg,#d9bd7e,#a88746)!important;color
 <div><label>Date of Birth <span>تاریخ پیدائش</span></label><input id="dob" type="date" required></div></div>
 <div class="row"><div><label>Religion <span>مذہب</span></label><select id="religion"><option>Islam</option><option>Hinduism</option><option>Christianity</option><option>Sikhism</option><option>Other</option></select></div>
 <div><label>Education <span>تعلیم</span></label><input id="education" type="text"></div></div>
-<div class="row"><div><label>Designation <span>عہدہ</span></label><input id="designation" type="text" maxlength="100" placeholder=""><small style="display:block;margin-top:7px;padding:7px 9px;color:#B22222;background:#FFF1F1;border-left:3px solid #B22222;border-radius:4px;font-size:12px;font-weight:700;line-height:1.7;direction:rtl;text-align:right">جس سطح پر آپ عہدہ رکھتے ہیں، وہ سطح اپنے عہدے کے ساتھ لازمی لکھیں، مثلاً: ضلعی، تعلقہ یا سٹی۔</small></div>
+<div class="row"><div><label>Post <span>عہدہ</span></label><select id="post"><option value="">Select post</option><option>Chairman</option><option>Vice Chairman</option><option>General Secretary</option><option>Additional General Secretary</option><option>Joint Secretary</option><option>Finance Secretary</option><option>Information Secretary</option><option>Media Adviser</option><option>Legal Adviser</option><option>Member</option><option value="__other">Other (write below)</option></select></div>
 <div><label>Wing <span>ونگ</span></label><select id="wing"><option>HRC</option></select></div></div>
+<input id="postx" class="hide" placeholder="Write your post" maxlength="60" style="margin-top:8px"><input id="designation" type="hidden">
 <div class="row"><div><label>Province <span>صوبہ</span></label><input id="prov" value="Sindh" readonly></div><div><label>District <span>ضلع</span></label><input id="dist" list="dist_list" placeholder="Search or select district" autocomplete="off"><datalist id="dist_list"></datalist></div></div><label>Taluka <span>تحصیل</span></label><input id="tal" list="tal_list" placeholder="Type or select taluka" autocomplete="off"><datalist id="tal_list"></datalist><div class="msg" id="locm"></div>
 <div id="lvlbox" class="hide"><label>Office Level <span>عہدے کی سطح</span></label><select id="lvl"></select><div class="msg" id="lvlm"></div></div>
 <label>Residence Address <span>مستقل پتہ</span></label><input id="res" required>
@@ -178,8 +179,25 @@ function onDist(){const raw=$("dist").value;const d=findByName(LOC.districts,raw
 $("dist").addEventListener("input",onDist);$("dist").addEventListener("change",onDist);
 const talName=()=>{const raw=$("tal").value.trim();const t=findByName(LOC.talukas,raw);return t?t.name:raw};
 $("tal").addEventListener("input",()=>refreshLvl());$("tal").addEventListener("change",()=>{const t=findByName(LOC.talukas,$("tal").value);if(t)$("tal").value=t.name;refreshLvl()});
-/* Designation is free text; no preset post or office-level options. */
-function officeInfo(){const designation=$("designation").value.replace(/\s+/g," ").trim();return designation?{designation:designation,level:"",area:""}:null}
+/* Post + Office Level: options are built from the chosen district and taluka, e.g. "District Media Adviser", "Taluka Media Adviser", "City Media Adviser" */
+const postName=()=>{const p=$("post").value;return p==="__other"?$("postx").value.replace(/\s+/g," ").trim():p};
+function levelOptions(){const post=postName(),d=LOC.district_id?(findByName(LOC.districts,$("dist").value)||{}).name:"",t=talName(),o=[];if(!post||post==="Member")return o;
+ o.push(["provincial","Provincial "+post+" (Sindh)","Provincial "+post,"Sindh"]);
+ if(d)o.push(["district","District "+post+" ("+d+")","District "+post,d]);
+ if(t){o.push(["taluka","Taluka "+post+" ("+t+")","Taluka "+post,t]);o.push(["city","City "+post+" ("+t+")","City "+post,t])}
+ return o}
+function refreshLvl(){const post=postName(),box=$("lvlbox"),sel=$("lvl"),keep=sel.value;$("postx").classList.toggle("hide",$("post").value!=="__other");
+ const opts=levelOptions();sel.textContent="";
+ if(!post||post==="Member"){box.classList.add("hide");return}
+ box.classList.remove("hide");
+ const ph=document.createElement("option");ph.value="";ph.textContent=LOC.district_id?"Select office level / سطح منتخب کریں":"First select district below / پہلے ضلع منتخب کریں";sel.append(ph);
+ opts.forEach(x=>{const e=document.createElement("option");e.value=x[0];e.textContent=x[1];sel.append(e)});
+ if(opts.some(x=>x[0]===keep))sel.value=keep;
+ $("lvlm").textContent=!talName()&&LOC.district_id?"Enter your taluka to also see Taluka and City options.":""}
+/* Final values sent to the server */
+function officeInfo(){const post=postName();if(!post)return null;if(post==="Member")return{designation:"Member",level:"member",area:""};
+ const x=levelOptions().find(o=>o[0]===$("lvl").value);return x?{designation:x[2],level:x[0],area:x[3]}:null}
+$("post").addEventListener("change",refreshLvl);$("postx").addEventListener("input",refreshLvl);$("lvl").addEventListener("change",refreshLvl);
 initLoc();
 $("cnic").addEventListener("input",()=>{TOK=uuid()});
 $("cnic").oninput=e=>{let v=e.target.value.replace(/\D/g,"").slice(0,13);e.target.value=v.length>12?v.slice(0,5)+"-"+v.slice(5,12)+"-"+v.slice(12):v.length>5?v.slice(0,5)+"-"+v.slice(5):v};
@@ -187,7 +205,7 @@ $("go").onclick=async()=>{const f=$("f");if(!f.reportValidity())return;if(!$("pv
  if(!/^\d{5}-\d{7}-\d$/.test($("cnic").value)){$("msg").textContent="CNIC must be 13 digits (#####-#######-#).";return}
  if(!/^(\+?92|0)?3\d{9}$/.test($("contact").value.replace(/[\s\-().]/g,""))){$("msg").textContent="Enter a valid mobile number, e.g. 03001234567.";return}
  if(!LOC.district_id){locMsg("Select a district from the list.",true);$("dist").focus();return}
- const OFF=officeInfo();if(!OFF){$("msg").textContent="Please enter your designation."; $("designation").focus();return}
+ const OFF=officeInfo();if(!OFF){$("msg").textContent=!postName()?"Please select your post.":"Please select your office level (District / Taluka / City).";(postName()?$("lvl"):$("post")).focus();return}$("designation").value=OFF.designation;
  const GO0="Submit & Generate PDF",setGo=t=>{$("go").textContent=t};$("go").disabled=true;setGo("⏳ Saving… / محفوظ ہو رہا ہے");$("msg").textContent="";
  const q={name:$("name").value,father:$("father").value,cnic:$("cnic").value,dob:$("dob").value,religion:$("religion").value,education:$("education").value,designation:$("designation").value,wing:$("wing").value,res:$("res").value,off:$("off").value,prof:$("prof").value,contact:$("contact").value,email:$("email").value,photo:$("pv").src,token:TOK,province_id:LOC.province_id,district_id:LOC.district_id,taluka_name:talName(),office_level:OFF.level,office_area:OFF.area};
  const R=await api("register",{method:"POST",json:q});
