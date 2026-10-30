@@ -224,23 +224,33 @@ H.export = async (req, res, admin) => {
   res.end('\uFEFF' + lines.join('\r\n') + '\r\n');
 };
 
-// Sends existing members to the Google Sheet (webhook) in batches; the Apps Script skips refs already present.
+// Sends existing members to the Google Sheet in batches (direct Sheets API first, Apps Script webhook as fallback).
+// Refs already in column A are skipped, so pressing the button twice never creates duplicates.
 H.sheetsync = async (req, res, admin) => {
   if (!A.can(admin, 'export') || !A.can(admin, 'cnic_full') || !A.can(admin, 'all_districts')) return DENIED(res, 'You may not send records to Google Sheets.');
-  if (!(process.env.GOOGLE_SHEETS_WEBHOOK_URL || '').trim() || !(process.env.GOOGLE_SHEETS_WEBHOOK_SECRET || '').trim()) {
-    return sendError(res, 409, 'sheets_not_configured', 'Google Sheet connection is not set up yet (webhook URL and secret missing in Vercel).');
+  const gs = require('../../lib/google-sheets');
+  let directOk = false;
+  try { directOk = !!gs.directConfig(); } catch (e) { return sendError(res, 409, 'sheets_not_configured', 'GOOGLE_SERVICE_ACCOUNT_JSON in Vercel is not valid (' + String(e.message).slice(0, 50) + ').'); }
+  if (!directOk && (!(process.env.GOOGLE_SHEETS_WEBHOOK_URL || '').trim() || !(process.env.GOOGLE_SHEETS_WEBHOOK_SECRET || '').trim())) {
+    return sendError(res, 409, 'sheets_not_configured', 'Google Sheet connection is not set up yet (service account JSON + sheet ID, or webhook URL + secret, missing in Vercel).');
   }
   const body = await readJson(req, 2000).catch(() => ({}));
   const offset = int(body && body.offset, 0, 0, 1000000), BATCH = 80;
   const r = await sb.select('members', [['select', 'ref_no,created_at,name,father_name,cnic,dob,religion,education,designation,office_level,office_area,wing,residence_address,office_address,profession,contact,email,province_id,district_id,taluka_name,status'], ['order', 'created_at.asc'], ['limit', String(BATCH)], ['offset', String(offset)]]);
   const fmtDate = iso => { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'numeric', year: 'numeric' }).formatToParts(new Date(iso)); const g = t => p.find(x => x.type === t).value; return +g('day') + '-' + +g('month') + '-' + g('year'); };
   const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
-  const rows = r.data.map(m => [m.ref_no || '', fmtDate(m.created_at), m.name || '', m.father_name || '', m.cnic || '', m.dob || '', m.religion || '', m.education || '', m.designation || '', m.wing || '', m.residence_address || '', m.office_address || '', m.profession || '', m.contact || '', m.email || '', m.province_id || '', m.district_id || '', m.taluka_name || '', cap(m.status), '', require('../../lib/google-sheets').capLevel(m.office_level), m.office_area || '']);
+  const pn = new Map(), dn = new Map();
+  try { (await sb.select('provinces', [['select', 'id,name'], ['limit', '50']])).data.forEach(x => pn.set(x.id, x.name)); } catch (e) { /* ids are used instead */ }
+  try { (await sb.select('districts', [['select', 'id,name'], ['limit', '500']])).data.forEach(x => dn.set(x.id, x.name)); } catch (e) { /* ids are used instead */ }
+  const rows = r.data.map(m => [m.ref_no || '', fmtDate(m.created_at), m.name || '', m.father_name || '', m.cnic || '', m.dob || '', m.religion || '', m.education || '', m.designation || '', m.wing || '', m.residence_address || '', m.office_address || '', m.profession || '', m.contact || '', m.email || '', pn.get(m.province_id) || m.province_id || '', dn.get(m.district_id) || m.district_id || '', m.taluka_name || '', cap(m.status), '', require('../../lib/google-sheets').capLevel(m.office_level), m.office_area || '']);
   let out = { added: 0, skipped: 0 };
   if (rows.length) {
-    const { appendBatchViaWebhook } = require('../../lib/google-sheets');
-    try { out = await appendBatchViaWebhook(rows); }
-    catch (e) { return sendError(res, 502, 'sheets_failed', 'Google Sheet did not accept the data. Check the Apps Script deployment and secret. (' + String(e.message || e).slice(0, 60) + ')'); }
+    try { out = await gs.appendBatch(rows); }
+    catch (e) {
+      const m = String((e && e.message) || e), who = e && e.serviceAccount ? ' Share the sheet (Editor) with ' + e.serviceAccount + '.' : '';
+      const hint = /http_40[34]/.test(m) ? 'Google refused access to the sheet.' + who : /http_404/.test(m) ? 'Sheet or tab not found. Check the sheet ID and tab name in Vercel.' : 'Google Sheet did not accept the data.';
+      return sendError(res, 502, 'sheets_failed', hint + ' (' + m.slice(0, 90) + ')');
+    }
   }
   const done = r.data.length < BATCH;
   if (done) await A.audit(req, admin, 'sheets_sync', 'members', null, { total_sent: offset + r.data.length });
