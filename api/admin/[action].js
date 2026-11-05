@@ -10,7 +10,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ['pending', 'approved', 'rejected'];
 const LIST_COLS = 'id,ref_no,name,cnic,contact,district_id,taluka_id,status,created_at';
 const FULL_COLS = 'id,ref_no,name,father_name,cnic,dob,religion,education,designation,office_level,office_area,wing,residence_address,office_address,profession,contact,email,photo_path,district_id,taluka_id,status,status_note,reviewed_by,reviewed_at,created_at,updated_at';
-const EXPORT_MAX = 20000;
 const DENIED = (res, msg) => sendError(res, 403, 'access_denied', msg || 'You do not have permission to do this.');
 
 // ---------- helpers ----------
@@ -43,12 +42,6 @@ async function loadMember(admin, id) {
   const q = [['id', 'eq.' + id], ['select', FULL_COLS], ['limit', '1']];
   if (!A.can(admin, 'all_districts')) q.splice(1, 0, ['district_id', 'eq.' + admin.district_id]);
   return (await sb.select('members', q, { single: true })).data;
-}
-
-function csvCell(v) {
-  let s = v === null || v === undefined ? '' : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;           // block spreadsheet formula injection
-  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
 async function geo() {
@@ -202,34 +195,12 @@ H.audit = async (req, res, admin) => {
   return send(res, 200, { ok: true, total: r.count, entries: r.data });
 };
 
-H.export = async (req, res, admin) => {
-  if (!A.can(admin, 'export')) return DENIED(res, 'You may not export records.');
-  const g = await geo();
-  const dn = new Map(g.districts.map(d => [d.id, d.name])), tn = new Map(g.talukas.map(t => [t.id, t.name]));
-  const filters = memberFilters(admin, req.query);
-  const rows = []; let off = 0;
-  while (rows.length < EXPORT_MAX) {
-    const r = await sb.select('members', [...filters, ['select', FULL_COLS.replace('photo_path,', '')], ['order', 'created_at.asc'], ['limit', '1000'], ['offset', String(off)]]);
-    rows.push(...r.data); if (r.data.length < 1000) break; off += 1000;
-  }
-  const head = ['Reference No', 'Name', 'Father Name', 'CNIC', 'Date of Birth', 'Religion', 'Education', 'Designation', 'Office Level', 'Office Area', 'Wing', 'Residence Address', 'Office Address', 'Profession', 'Contact', 'Email', 'District', 'Taluka', 'Status', 'Registered'];
-  const lines = [head.join(',')];
-  for (const m of rows.slice(0, EXPORT_MAX)) {
-    lines.push([m.ref_no, m.name, m.father_name, shapeRow(admin, m).cnic, m.dob, m.religion, m.education, m.designation, m.office_level, m.office_area, m.wing, m.residence_address, m.office_address, m.profession, m.contact, m.email, dn.get(m.district_id) || '', tn.get(m.taluka_id) || '', m.status, m.created_at].map(csvCell).join(','));
-  }
-  await A.audit(req, admin, 'export_csv', 'members', null, { rows: Math.min(rows.length, EXPORT_MAX), filters: Object.fromEntries(['district_id', 'taluka_id', 'status', 'date_from', 'date_to'].filter(k => req.query[k]).map(k => [k, req.query[k]])) });
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="npciha-members.csv"');
-  res.end('\uFEFF' + lines.join('\r\n') + '\r\n');
-};
-
 // action -> { methods, public?, mutating? }
 const ROUTES = {
   login: { methods: ['POST'], pub: true, mutating: true }, logout: { methods: ['POST'], mutating: true },
   me: { methods: ['GET'] }, districts: { methods: ['GET'] }, members: { methods: ['GET'] },
   member: { methods: ['GET', 'PATCH', 'DELETE'], mutating: false }, status: { methods: ['POST'], mutating: true },
-  summary: { methods: ['GET'] }, audit: { methods: ['GET'] }, export: { methods: ['GET'] },
+  summary: { methods: ['GET'] }, audit: { methods: ['GET'] },
 };
 
 module.exports = async (req, res) => {

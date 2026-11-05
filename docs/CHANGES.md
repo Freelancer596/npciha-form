@@ -19,7 +19,7 @@ Design is untouched. Only script logic and the *admin* panel were edited; the pu
 | One per-page "submission token" (new one when the CNIC field is edited) so a double-tap or retry cannot create two records. | Duplicate-submission prevention. |
 | Removed `claude.use("db")` storage and the embedded password hash / client-side password check. | Insecure / non-functional on Vercel. |
 | Admin login: added **Admin Username** box (same style as the password box) and password is verified by the server. | Needed for real accounts and roles. This is the only visible change on the login panel. |
-| Admin panel: search box, district/taluka/status filters, Summary, Export CSV, Audit log, Sign out, and per-row **Manage** (approve/reject, district/taluka, edit field, delete). Built only with the page's existing classes (`.btn.o`, `.row`, `.m`, `.msg`, inputs/selects). | Requested admin features. These live inside the previously plain admin list; the public form is unaffected. |
+| Admin panel: search box, district/taluka/status filters, Summary, Audit log, Sign out, and per-row **Manage** (approve/reject, district/taluka, edit field, delete). Built only with the page's existing classes (`.btn.o`, `.row`, `.m`, `.msg`, inputs/selects). | Requested admin features. These live inside the previously plain admin list; the public form is unaffected. |
 | PDF: `if(m.photo)` guard before `addImage`. | Avoids a crash if a record has no photo. Layout unchanged. |
 | `claude` stub line kept; `save()` unchanged (falls back to `d.save`). | Preserve behaviour. |
 

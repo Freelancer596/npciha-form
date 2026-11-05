@@ -126,7 +126,7 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   process.env.SETUP_TOKEN = tkn;
 
   // ========== unauthenticated access ==========
-  for (const [m, p] of [['GET', '/api/admin/members'], ['GET', '/api/admin/summary'], ['GET', '/api/admin/audit'], ['GET', '/api/admin/export'], ['GET', '/api/admin/districts'], ['GET', '/api/admin/me'], ['GET', '/api/admin/member?id=' + d.t.members[0].id]]) {
+  for (const [m, p] of [['GET', '/api/admin/members'], ['GET', '/api/admin/summary'], ['GET', '/api/admin/audit'], ['GET', '/api/admin/districts'], ['GET', '/api/admin/me'], ['GET', '/api/admin/member?id=' + d.t.members[0].id]]) {
     r = await call(m, p, { admin: true });
     ok(`unauthenticated ${m} ${p.split('?')[0]} -> 401, no data`, r.s === 401 && !/Test Member|42101/.test(r.text));
   }
@@ -209,7 +209,6 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('GET', '/api/admin/members?q=1111111', { admin: true, cookie: DE.cookie }); ok('data entry cannot search by CNIC', r.j.total === 0);
   r = await call('GET', '/api/admin/member?id=' + ids['Ali Raza'], { admin: true, cookie: DE.cookie }); ok('data entry detail has masked CNIC but includes photo for form', r.j.member.cnic.includes('*') && r.j.photo && r.j.photo.startsWith('data:image/jpeg;base64,'));
   r = await call('POST', '/api/admin/status', { body: { id: ids['Ali Raza'], status: 'approved' }, admin: true, cookie: DE.cookie }); ok('data entry cannot approve (403)', r.s === 403);
-  r = await call('GET', '/api/admin/export', { admin: true, cookie: DE.cookie }); ok('data entry cannot export (403)', r.s === 403);
   r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { cnic: '42101-9999999-9' }, admin: true, cookie: DE.cookie }); ok('data entry cannot change CNIC (403)', r.s === 403);
   r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { prof: 'Engineer' }, admin: true, cookie: DE.cookie }); ok('data entry can correct ordinary fields', r.s === 200);
   r = await call('GET', '/api/admin/audit', { admin: true, cookie: HA.cookie }); ok('district admin cannot read audit log (403)', r.s === 403);
@@ -237,15 +236,11 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { status: 'approved', ref_no: 'HACK', photo_path: 'x' }, admin: true, cookie: S.cookie }); ok('mass-assignment of status/ref/photo via edit ignored (400/422)', r.s === 422);
   d = await dump(); ok('reference number unchanged after attempted overwrite', d.t.members.find(m => m.name === 'Ali Raza').ref_no === regs[0]);
 
-  // ---- summary / export ----
+  // ---- summary ----
   r = await call('GET', '/api/admin/summary', { admin: true, cookie: S.cookie });
   const hy = r.j.districts.find(x => x.district === 'Hyderabad');
   ok('summary: totals and district-wise counts', r.j.totals.total === 4 && r.j.totals.approved === 1 && r.j.totals.rejected === 1 && hy.total === 2 && r.j.districts.some(x => x.district === 'Unassigned'));
   r = await call('GET', '/api/admin/summary', { admin: true, cookie: HA.cookie }); ok('district admin summary limited to own district', r.j.totals.total === 2);
-  r = await call('GET', '/api/admin/export?district_id=1', { admin: true, cookie: S.cookie });
-  const rawCsv = Buffer.from(await (await fetch(BASE + '/api/admin/export?district_id=1', { headers: { Cookie: S.cookie, 'X-Requested-With': 'npciha' } })).arrayBuffer());
-  ok('CSV export for authorised admin (UTF-8 BOM, attachment, filtered)', r.s === 200 && rawCsv[0] === 0xEF && rawCsv[1] === 0xBB && rawCsv[2] === 0xBF && /attachment/.test(r.h.get('content-disposition')) && r.text.includes('Ali Raza') && !r.text.includes('Dilip Kumar'));
-  r = await call('GET', '/api/admin/export', { admin: true, cookie: S.cookie }); ok("CSV neutralises formula injection ('=1+1' -> \"'=1+1\")", r.text.includes("'=1+1") && !/,=1\+1,/.test(r.text));
   // ---- Private CSV feed for Google Sheets (IMPORTDATA) ----
   r = await call('GET', '/api/sheet-feed?key=whatever'); ok('sheet-feed: no token configured -> 404', r.s === 404);
   process.env.SHEET_FEED_TOKEN = 'feed-token-feed-token-feed-token-1';
@@ -255,7 +250,6 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('sheet-feed: right key -> CSV with header + all members, formula text neutralised', r.s === 200 && /text\/csv/.test(r.h.get('content-type')) && r.text.startsWith('"Reference No","Application Date"') && r.text.split('\r\n').length >= 3 && !/,"=1\+1"/.test(r.text));
   r = await call('GET', '/api/sheet-feed?header=0&key=feed-token-feed-token-feed-token-1'); ok('sheet-feed: header=0 returns data rows only', r.s === 200 && !r.text.includes('Reference No'));
   delete process.env.SHEET_FEED_TOKEN;
-  r = await call('GET', '/api/admin/export', { admin: true, cookie: HA.cookie }); ok("district admin CSV contains only own district's rows", r.s === 200 && !r.text.includes('Dilip Kumar') && !r.text.includes('Mary John'));
 
   // ---- delete with confirmation, audit ----
   r = await call('DELETE', '/api/admin/member?id=' + ids['Mary John'], { body: {}, admin: true, cookie: S.cookie }); ok('delete without confirmation refused (400)', r.s === 400);
@@ -264,7 +258,7 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('delete with confirmation removes the record and its photo', r.s === 200 && d.t.members.length === 3 && d.files.length === filesBefore - 1);
   r = await call('GET', '/api/admin/audit?limit=200', { admin: true, cookie: S.cookie });
   const acts = new Set(r.j.entries.map(e => e.action));
-  ok('audit log records login, view, update, status, export, delete', ['login', 'view_member', 'update_member', 'set_status', 'export_csv', 'delete_member', 'login_failed', 'admin_created'].every(a => acts.has(a)), [...acts].join(','));
+  ok('audit log records login, view, update, status, delete', ['login', 'view_member', 'update_member', 'set_status', 'delete_member', 'login_failed', 'admin_created'].every(a => acts.has(a)), [...acts].join(','));
   const auditText = JSON.stringify((await dump()).t.audit_log);
   ok('audit log never contains a full CNIC, password or token', !/\d{5}-\d{7}-\d/.test(auditText) && !auditText.includes(PW) && !auditText.includes(S.cookie.split('=')[1]));
 

@@ -112,7 +112,7 @@ Use a unique strong password per person; also turn on 2-step verification for yo
 
 ## 9. Using the site
 * **Public form** works exactly as before. A registration is reported as saved **only after** the database confirms it; the PDF is made from the saved record and carries the server-issued reference (`NPCIHA/2026/000001`).
-* **Admin** (button at bottom right): sign in with username + password. Search by name / reference / CNIC, filter by district, taluka, status; **Summary**, **Export CSV**, **Audit log**, **Sign out**; per record **View**, **PDF**, **Manage** (approve/reject, district/taluka, edit a field, delete with double confirmation).
+* **Admin** (button at bottom right): sign in with username + password. Search by name / reference / CNIC, filter by district, taluka, status; **Summary**, **Audit log**, **Sign out**; per record **View**, **PDF**, **Manage** (approve/reject, district/taluka, edit a field, delete with double confirmation).
 * New registrations have **no district**, because the original form has no district field (design preserved). A Super Admin assigns district/taluka under **Manage**; from then on that district's admins see the record.
 * The PDF is the application form exactly as before. It is not a membership certificate, and approval status is not printed on it.
 
