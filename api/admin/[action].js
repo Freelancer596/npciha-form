@@ -224,35 +224,12 @@ H.export = async (req, res, admin) => {
   res.end('\uFEFF' + lines.join('\r\n') + '\r\n');
 };
 
-// Sends existing members to the Google Sheet (webhook) in batches; the Apps Script skips refs already present.
-H.sheetsync = async (req, res, admin) => {
-  if (!A.can(admin, 'export') || !A.can(admin, 'cnic_full') || !A.can(admin, 'all_districts')) return DENIED(res, 'You may not send records to Google Sheets.');
-  if (!(process.env.GOOGLE_SHEETS_WEBHOOK_URL || '').trim() || !(process.env.GOOGLE_SHEETS_WEBHOOK_SECRET || '').trim()) {
-    return sendError(res, 409, 'sheets_not_configured', 'Google Sheet connection is not set up yet (webhook URL and secret missing in Vercel).');
-  }
-  const body = await readJson(req, 2000).catch(() => ({}));
-  const offset = int(body && body.offset, 0, 0, 1000000), BATCH = 80;
-  const r = await sb.select('members', [['select', 'ref_no,created_at,name,father_name,cnic,dob,religion,education,designation,office_level,office_area,wing,residence_address,office_address,profession,contact,email,province_id,district_id,taluka_name,status'], ['order', 'created_at.asc'], ['limit', String(BATCH)], ['offset', String(offset)]]);
-  const fmtDate = iso => { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'numeric', year: 'numeric' }).formatToParts(new Date(iso)); const g = t => p.find(x => x.type === t).value; return +g('day') + '-' + +g('month') + '-' + g('year'); };
-  const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pending';
-  const rows = r.data.map(m => [m.ref_no || '', fmtDate(m.created_at), m.name || '', m.father_name || '', m.cnic || '', m.dob || '', m.religion || '', m.education || '', m.designation || '', m.wing || '', m.residence_address || '', m.office_address || '', m.profession || '', m.contact || '', m.email || '', m.province_id || '', m.district_id || '', m.taluka_name || '', cap(m.status), '', require('../../lib/google-sheets').capLevel(m.office_level), m.office_area || '']);
-  let out = { added: 0, skipped: 0 };
-  if (rows.length) {
-    const { appendBatchViaWebhook } = require('../../lib/google-sheets');
-    try { out = await appendBatchViaWebhook(rows); }
-    catch (e) { return sendError(res, 502, 'sheets_failed', 'Google Sheet did not accept the data. Check the Apps Script deployment and secret. (' + String(e.message || e).slice(0, 60) + ')'); }
-  }
-  const done = r.data.length < BATCH;
-  if (done) await A.audit(req, admin, 'sheets_sync', 'members', null, { total_sent: offset + r.data.length });
-  return send(res, 200, { ok: true, sent: r.data.length, added: out.added, skipped: out.skipped, next_offset: offset + r.data.length, done });
-};
-
 // action -> { methods, public?, mutating? }
 const ROUTES = {
   login: { methods: ['POST'], pub: true, mutating: true }, logout: { methods: ['POST'], mutating: true },
   me: { methods: ['GET'] }, districts: { methods: ['GET'] }, members: { methods: ['GET'] },
   member: { methods: ['GET', 'PATCH', 'DELETE'], mutating: false }, status: { methods: ['POST'], mutating: true },
-  summary: { methods: ['GET'] }, audit: { methods: ['GET'] }, export: { methods: ['GET'] }, sheetsync: { methods: ['POST'], mutating: true },
+  summary: { methods: ['GET'] }, audit: { methods: ['GET'] }, export: { methods: ['GET'] },
 };
 
 module.exports = async (req, res) => {

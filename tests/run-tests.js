@@ -255,16 +255,6 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('sheet-feed: right key -> CSV with header + all members, formula text neutralised', r.s === 200 && /text\/csv/.test(r.h.get('content-type')) && r.text.startsWith('"Reference No","Application Date"') && r.text.split('\r\n').length >= 3 && !/,"=1\+1"/.test(r.text));
   r = await call('GET', '/api/sheet-feed?header=0&key=feed-token-feed-token-feed-token-1'); ok('sheet-feed: header=0 returns data rows only', r.s === 200 && !r.text.includes('Reference No'));
   delete process.env.SHEET_FEED_TOKEN;
-  // ---- Send existing members to Google Sheet (Apps Script webhook) ----
-  r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } }); ok('sheetsync: not configured -> 409', r.s === 409);
-  process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/TEST/exec'; process.env.GOOGLE_SHEETS_WEBHOOK_SECRET = 'test-secret';
-  const realFetch = global.fetch; let hook = null;
-  global.fetch = async (u, o) => { if (String(u).startsWith('https://script.google.com/')) { hook = JSON.parse(o.body); return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, added: hook.rows.length, skipped: 0 }) }; } return realFetch(u, o); };
-  r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: S.cookie, body: { offset: 0 } });
-  ok('sheetsync: super admin sends all members in one batch, 22 columns, secret included', r.s === 200 && r.j.ok && r.j.done === true && r.j.sent === hook.rows.length && hook.rows[0].length === 22 && hook.secret === 'test-secret');
-  r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: HA.cookie, body: { offset: 0 } }); ok('sheetsync: district admin refused (403)', r.s === 403);
-  r = await call('POST', '/api/admin/sheetsync', { admin: true, cookie: DE.cookie, body: { offset: 0 } }); ok('sheetsync: data entry refused (403)', r.s === 403);
-  global.fetch = realFetch; delete process.env.GOOGLE_SHEETS_WEBHOOK_URL; delete process.env.GOOGLE_SHEETS_WEBHOOK_SECRET;
   r = await call('GET', '/api/admin/export', { admin: true, cookie: HA.cookie }); ok("district admin CSV contains only own district's rows", r.s === 200 && !r.text.includes('Dilip Kumar') && !r.text.includes('Mary John'));
 
   // ---- delete with confirmation, audit ----
