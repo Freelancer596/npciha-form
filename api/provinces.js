@@ -8,6 +8,7 @@ module.exports = async (req, res) => {
   try {
     if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return sendError(res, 405, 'method_not_allowed', 'Method not allowed.'); }
     const r = await sb.select('provinces', [['select', 'id,code,name'], ['active', 'eq.true'], ['order', 'name.asc']]);
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return send(res, 200, { ok: true, items: r.data || [] });
   } catch (e) { return handleError(res, e, 'provinces'); }
 };

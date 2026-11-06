@@ -11,6 +11,7 @@ module.exports = async (req, res) => {
     const did = toId(new URL(req.url, 'http://x').searchParams.get('district_id'));
     if (!did || Number.isNaN(did)) return sendError(res, 422, 'validation_failed', 'Invalid district.');
     const r = await sb.select('talukas', [['select', 'id,name'], ['district_id', 'eq.' + did], ['active', 'eq.true'], ['verified', 'eq.true'], ['order', 'name.asc'], ['limit', '500']]);
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     return send(res, 200, { ok: true, items: r.data || [] });
   } catch (e) { return handleError(res, e, 'talukas'); }
 };
