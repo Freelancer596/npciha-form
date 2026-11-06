@@ -99,19 +99,19 @@ nav button.on{background:linear-gradient(180deg,#d9bd7e,#a88746)!important;color
 
 <main>
 <div id="v1" class="card"><form onsubmit="return false" id="f">
-<label>Name <span>نام</span></label><input id="name" required>
-<label>Father Name <span>ولدیت</span></label><input id="father" required>
+<label>Name <span>نام</span></label><input id="name" required autocapitalize="words">
+<label>Father Name <span>ولدیت</span></label><input id="father" required autocapitalize="words">
 <div class="row"><div><label>CNIC # <span>شناختی کارڈ نمبر</span></label><input id="cnic" inputmode="numeric" placeholder="#####-#######-#" maxlength="15" required></div>
 <div><label>Date of Birth <span>تاریخ پیدائش</span></label><input id="dob" type="date" required></div></div>
 <div class="row"><div><label>Religion <span>مذہب</span></label><select id="religion"><option>Islam</option><option>Hinduism</option><option>Christianity</option><option>Sikhism</option><option>Other</option></select></div>
-<div><label>Education <span>تعلیم</span></label><input id="education" type="text"></div></div>
-<div class="row"><div><label>Designation <span>عہدہ</span></label><input id="designation" type="text" maxlength="100" placeholder=""><small style="display:block;margin-top:7px;padding:7px 9px;color:#B22222;background:#FFF1F1;border-left:3px solid #B22222;border-radius:4px;font-size:12px;font-weight:700;line-height:1.7;direction:rtl;text-align:right">جس سطح پر آپ عہدہ رکھتے ہیں، وہ سطح اپنے عہدے کے ساتھ لازمی لکھیں، مثلاً: ضلعی، تعلقہ یا سٹی۔</small></div>
+<div><label>Education <span>تعلیم</span></label><input id="education" type="text" list="edu_list" autocomplete="off" autocapitalize="words" maxlength="100"><datalist id="edu_list"><option value="Primary"><option value="Middle"><option value="Matric"><option value="Intermediate"><option value="F.A"><option value="F.Sc"><option value="I.Com"><option value="ICS"><option value="Bachelor"><option value="B.A"><option value="B.Sc"><option value="B.Com"><option value="BBA"><option value="BS"><option value="BE"><option value="B.Ed"><option value="BCS"><option value="LLB"><option value="MBBS"><option value="BDS"><option value="Pharm-D"><option value="Master"><option value="M.A"><option value="M.Sc"><option value="M.Com"><option value="MBA"><option value="MS"><option value="M.Ed"><option value="LLM"><option value="M.Phil"><option value="PhD"><option value="Diploma"><option value="DAE"><option value="Certificate"><option value="Hafiz-e-Quran"><option value="Dars-e-Nizami (Alim)"><option value="Under Matric"><option value="Literate"></datalist></div></div>
+<div class="row"><div><label>Designation <span>عہدہ</span></label><input id="designation" type="text" maxlength="100" placeholder="" list="des_list" autocomplete="off" autocapitalize="words"><datalist id="des_list"><option value="Chairman"><option value="Vice Chairman"><option value="Patron"><option value="President"><option value="Vice President"><option value="Senior Vice President"><option value="General Secretary"><option value="Joint Secretary"><option value="Deputy Secretary"><option value="Secretary"><option value="Finance Secretary"><option value="Information Secretary"><option value="Organizer"><option value="Joint Organizer"><option value="Coordinator"><option value="Focal Person"><option value="Spokesperson"><option value="Legal Advisor"><option value="Advisor"><option value="Treasurer"><option value="Executive Member"><option value="Member"></datalist><small style="display:block;margin-top:7px;padding:7px 9px;color:#B22222;background:#FFF1F1;border-left:3px solid #B22222;border-radius:4px;font-size:12px;font-weight:700;line-height:1.7;direction:rtl;text-align:right">جس سطح پر آپ عہدہ رکھتے ہیں، وہ سطح اپنے عہدے کے ساتھ لازمی لکھیں، مثلاً: ضلعی، تعلقہ یا سٹی۔</small></div>
 <div><label>Wing <span>ونگ</span></label><select id="wing"><option>HRC</option></select></div></div>
 <div class="row"><div><label>Province <span>صوبہ</span></label><input id="prov" value="Sindh" readonly></div><div><label>District <span>ضلع</span></label><input id="dist" list="dist_list" placeholder="Search or select district" autocomplete="off"><datalist id="dist_list"></datalist></div></div><label>Taluka <span>تحصیل</span></label><input id="tal" list="tal_list" placeholder="Type or select taluka" autocomplete="off"><datalist id="tal_list"></datalist><div class="msg" id="locm"></div>
 <div id="lvlbox" class="hide"><label>Office Level <span>عہدے کی سطح</span></label><select id="lvl"></select><div class="msg" id="lvlm"></div></div>
-<label>Residence Address <span>مستقل پتہ</span></label><input id="res" required>
-<label>Office Address <span>دفتر کا پتہ</span></label><input id="off">
-<div class="row"><div><label>Profession <span>کاروبار</span></label><input id="prof"></div>
+<label>Residence Address <span>مستقل پتہ</span></label><input id="res" required autocapitalize="words">
+<label>Office Address <span>دفتر کا پتہ</span></label><input id="off" autocapitalize="words">
+<div class="row"><div><label>Profession <span>کاروبار</span></label><input id="prof" list="prof_list" autocomplete="off" autocapitalize="words" maxlength="100"><datalist id="prof_list"><option value="Business"><option value="Businessman"><option value="Student"><option value="Teacher"><option value="Lecturer"><option value="Professor"><option value="Doctor"><option value="Lawyer"><option value="Advocate"><option value="Engineer"><option value="Farmer"><option value="Shopkeeper"><option value="Trader"><option value="Contractor"><option value="Social Worker"><option value="Journalist"><option value="Government Employee"><option value="Private Job"><option value="Banker"><option value="Accountant"><option value="Driver"><option value="Labourer"><option value="Housewife"><option value="Retired"><option value="Imam"><option value="Politician"><option value="Unemployed"></datalist></div>
 <div><label>Contact <span>موبائل نمبر</span></label><input id="contact" type="tel" required></div></div>
 <label>E-mail Address <span>ای میل ایڈریس</span></label><input id="email" type="email">
 <label>Passport-size Photo <span>پاسپورٹ سائز تصویر</span></label><div style="position:relative"><div class="pbtn">Tap to Choose / Take Photo</div><input id="photo" type="file" accept="image/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer"></div><div class="msg" id="ps">No photo chosen yet.</div><div dir="rtl" lang="ur" style="margin-top:8px;padding:10px 12px;border:1px solid var(--b);border-right:4px solid #b8923f;background:rgba(255,255,255,.55);font-size:15px;line-height:1.9;color:#242629"><b>ہدایت:</b> اوپر والے کالے بٹن پر کلک کریں، پھر اپنی پاسپورٹ سائز تصویر منتخب کریں یا کیمرے سے کھینچیں۔ تصویر لگ جانے پر نیچے تصویر نظر آئے گی اور سبز رنگ میں "تیار" جیسا پیغام آئے گا۔</div><img id="pv" alt="">
@@ -310,4 +310,19 @@ document.addEventListener('visibilitychange',function(){if(document.hidden)leave
 addEventListener('pageshow',resume);addEventListener('focus',resume);
 play();
 var chk=setInterval(function(){if(!document.getElementById('npciha-logo-intro')){clearInterval(chk);introGone=true;tryAudible()}},300);
-})();</script></body></html>
+})();</script><script>(function(){
+/* Light typing help (never blocks typing; Urdu text is left untouched):
+   - suggestions come from the <datalist> lists (type "inter" -> Intermediate); the person may also type anything else
+   - on leaving a field: extra spaces removed; an all-lowercase English entry gets Capital Letters;
+     an entry that equals a suggestion apart from upper/lower case is written exactly as in the list */
+var IDS=['name','father','education','designation','prof','res','off'];
+function canon(el){var l=el.getAttribute('list'),dl=l&&document.getElementById(l);if(!dl)return null;var m={};[].forEach.call(dl.options,function(o){m[o.value.toLowerCase()]=o.value});return m}
+function fix(el){if(!el||!el.value)return;var v=el.value.replace(/\s+/g,' ').trim(),m=canon(el);
+ if(m&&m[v.toLowerCase()])v=m[v.toLowerCase()];
+ else if(/^[\x00-\x7F]+$/.test(v)&&v===v.toLowerCase())v=v.replace(/(^|[\s(\-\/])([a-z])/g,function(x,a,b){return a+b.toUpperCase()});
+ if(v!==el.value)el.value=v}
+function fixAll(){IDS.forEach(function(i){fix(document.getElementById(i))})}
+IDS.forEach(function(i){var el=document.getElementById(i);if(el)el.addEventListener('change',function(){fix(el)})});
+document.addEventListener('click',function(e){if(e.target&&e.target.closest&&e.target.closest('#go'))fixAll()},true);
+})();</script>
+</body></html>
