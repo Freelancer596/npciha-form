@@ -93,15 +93,10 @@ module.exports = async (req, res) => {
       throw e;
     }
 
-    // Mirror the saved application to Google Sheets when configured. A Sheets outage must not
-    // undo or block the authoritative Supabase registration.
+    // Rewrite the whole Google Sheet from the database (every row, full names) when configured.
+    // A Sheets outage must not undo or block the authoritative Supabase registration.
     const publicRecord = publicMember(v, row);
-    try {
-      const { appendRegistration } = require('../lib/google-sheets');
-      await appendRegistration(publicRecord, loc.value);
-    } catch (sheetError) {
-      console.error('[register] Google Sheets sync failed:', sheetError && sheetError.message ? sheetError.message : 'unknown_error');
-    }
+    await require('../lib/google-sheets').syncAll('register');
 
     // Success is reported only now, after the database confirmed the row.
     console.log('[register] saved member ref=' + row.ref_no);

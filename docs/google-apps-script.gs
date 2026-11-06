@@ -1,4 +1,6 @@
-// NPCIH-A: receives registration rows from the website and appends them to this spreadsheet.
+// NPCIH-A: receives the member list from the website and keeps this spreadsheet in sync.
+// The website sends mode:'replace' (header + ALL members, with full district/province names) on every new
+// registration and every approve / reject / edit / delete: the whole tab is rewritten each time.
 // Paste in Extensions > Apps Script, set SECRET, then Deploy > Web app (Execute as: Me, Access: Anyone).
 var SECRET = 'PUT-YOUR-OWN-LONG-RANDOM-SECRET-HERE';
 var TAB = 'Applications';
@@ -19,6 +21,20 @@ function doPost(e) {
     var d = JSON.parse(e.postData.contents);
     if (!SECRET || d.secret !== SECRET) return out({ ok: false, error: 'bad_secret' });
     var rows = d.rows && d.rows.length ? d.rows : (d.row && d.row.length ? [d.row] : []);
+    var ss0 = SpreadsheetApp.getActiveSpreadsheet();
+    if (d.mode === 'replace') {                       // full refresh: write header + every member, drop what is left below
+      var sh0 = ss0.getSheetByName(TAB) || ss0.insertSheet(TAB);
+      var all = [d.headers].concat(d.rows || []);
+      var width0 = d.headers.length;
+      var rng0 = sh0.getRange(1, 1, all.length, width0);
+      rng0.setNumberFormat('@');                      // keep CNIC / phone / dates exactly as sent (text)
+      rng0.setValues(all);
+      var lastRow = sh0.getLastRow();
+      if (lastRow > all.length) sh0.getRange(all.length + 1, 1, lastRow - all.length, sh0.getMaxColumns()).clearContent();
+      sh0.setFrozenRows(1);
+      sh0.getRange(1, 1, 1, width0).setFontWeight('bold');
+      return out({ ok: true, mode: 'replace', written: (d.rows || []).length });
+    }
     if (!rows.length) return out({ ok: false, error: 'no_row' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sh = ss.getSheetByName(TAB) || ss.insertSheet(TAB);

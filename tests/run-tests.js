@@ -326,6 +326,38 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   const allSrc = walk(root).filter(f => !/tests[\/\\]/.test(f) && !/\.jpg$|\.png$/.test(f)).map(f => fs.readFileSync(f, 'utf8')).join('\n');
   ok('project source has no real-looking secrets (JWTs, sb_secret_, private keys)', !/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9]{10,}|BEGIN (RSA )?PRIVATE KEY/.test(allSrc));
 
+  // ---- Google Sheet: every change rewrites the WHOLE sheet with real names ----
+  {
+    process.env.GOOGLE_SHEETS_WEBHOOK_URL = 'https://script.google.com/macros/s/TEST/exec'; process.env.GOOGLE_SHEETS_WEBHOOK_SECRET = 'test-secret';
+    const realFetch = global.fetch; const hooks = []; let oldScript = false;
+    global.fetch = async (u, o) => { if (String(u).startsWith('https://script.google.com/')) { const b = JSON.parse(o.body); hooks.push(b); return { ok: true, status: 200, text: async () => JSON.stringify(oldScript ? { ok: true, added: 0, skipped: 0 } : { ok: true, mode: 'replace', written: b.rows.length }) }; } return realFetch(u, o); };
+    await setup({ username: 'boss', role: 'super_admin' });
+    const S2 = await login('boss', PW);
+    const n0 = state.t.members.length;
+    r = await call('POST', '/api/register', { body: form({ name: 'Sheet Person', cnic: '42101-9999999-9', designation: 'Member', province_id: 1, district_id: 1, taluka_name: 'Latifabad' }) });
+    const h1 = hooks[hooks.length - 1];
+    ok('sheet: new registration sends the WHOLE list in replace mode (all members, not just one)', r.s === 201 && h1 && h1.mode === 'replace' && h1.rows.length === n0 + 1);
+    ok('sheet: headers say Province / District (not IDs)', h1 && h1.headers[15] === 'Province' && h1.headers[16] === 'District' && !h1.headers.some(x => /ID$/.test(x)));
+    const mine = h1 && h1.rows.find(x => x[2] === 'Sheet Person');
+    ok('sheet: province and district are full names, taluka name, status Pending', mine && mine[15] === 'Sindh' && mine[16] === 'Hyderabad' && mine[17] === 'Latifabad' && mine[18] === 'Pending');
+    ok('sheet: no ID numbers in the province/district columns of any row', h1.rows.every(x => !/^\d+$/.test(String(x[15])) && !/^\d+$/.test(String(x[16]))));
+    ok('sheet: every row has all 22 columns', h1.rows.every(x => x.length === 22));
+    const sid = state.t.members.find(m => m.name === 'Sheet Person').id, nh = hooks.length;
+    r = await call('POST', '/api/admin/status', { body: { id: sid, status: 'approved' }, admin: true, cookie: S2.cookie });
+    const h2 = hooks[hooks.length - 1];
+    ok('sheet: approving re-sends everything and the status shows Approved', r.s === 200 && hooks.length === nh + 1 && h2.mode === 'replace' && h2.rows.find(x => x[2] === 'Sheet Person')[18] === 'Approved' && h2.rows.length === h1.rows.length);
+    r = await call('DELETE', '/api/admin/member?id=' + sid, { body: { confirm: 'DELETE' }, admin: true, cookie: S2.cookie });
+    const h3 = hooks[hooks.length - 1];
+    ok('sheet: deleting a member re-sends the list without that member', r.s === 200 && !h3.rows.some(x => x[2] === 'Sheet Person') && h3.rows.length === h1.rows.length - 1);
+    oldScript = true;
+    r = await call('POST', '/api/register', { body: form({ name: 'Old Script Person', cnic: '42101-8888888-8', designation: 'Member' }) });
+    ok('sheet: an outdated Apps Script never blocks the registration (still 201)', r.s === 201);
+    delete process.env.GOOGLE_SHEETS_WEBHOOK_URL; delete process.env.GOOGLE_SHEETS_WEBHOOK_SECRET; global.fetch = realFetch;
+    const before = hooks.length;
+    r = await call('POST', '/api/register', { body: form({ name: 'No Sheet Person', cnic: '42101-7777777-7', designation: 'Member' }) });
+    ok('sheet: when not configured nothing is sent and registration still works', r.s === 201 && hooks.length === before);
+  }
+
   // ---- summary ----
   const passed = results.filter(x => x.pass).length, failed = results.length - passed;
   console.log(`\n=== ${passed} passed, ${failed} failed, ${results.length} total ===`);

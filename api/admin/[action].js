@@ -5,6 +5,7 @@ const sb = require('../../lib/sb');
 const { MAX_BODY, secHeaders, send, sendError, sameOrigin, readJson, handleError, ipHash } = require('../../lib/http');
 const A = require('../../lib/auth');
 const { validateEdit, maskCnic, normCnic } = require('../../lib/validate');
+const { syncAll } = require('../../lib/google-sheets');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ['pending', 'approved', 'rejected'];
@@ -146,6 +147,7 @@ H.member = async (req, res, admin) => {
     if (!out.length) return sendError(res, 404, 'not_found', 'Member not found.');
     const changed = Object.keys(patch); // field names only; values (CNIC etc.) are not logged
     await A.audit(req, admin, 'update_member', 'member', m.id, { ref: m.ref_no, fields: changed });
+    await syncAll('admin');
     return send(res, 200, { ok: true, updated: changed });
   }
 
@@ -156,6 +158,7 @@ H.member = async (req, res, admin) => {
     await sb.remove('members', [['id', 'eq.' + m.id]]);
     if (m.photo_path) { try { await sb.deleteObject(m.photo_path); } catch (e) { console.error('[admin] photo delete failed for a removed member'); } }
     await A.audit(req, admin, 'delete_member', 'member', m.id, { ref: m.ref_no, cnic: maskCnic(m.cnic), status: m.status });
+    await syncAll('admin');
     return send(res, 200, { ok: true });
   }
   res.setHeader('Allow', 'GET, PATCH, DELETE');
@@ -172,6 +175,7 @@ H.status = async (req, res, admin) => {
   const note = String(b.note || '').replace(/[\u0000-\u001F]/g, ' ').trim().slice(0, 300) || null;
   await sb.update('members', [['id', 'eq.' + m.id]], { status: b.status, status_note: note, reviewed_by: admin.username, reviewed_at: new Date().toISOString() });
   await A.audit(req, admin, 'set_status', 'member', m.id, { ref: m.ref_no, from: m.status, to: b.status });
+  await syncAll('admin');
   return send(res, 200, { ok: true, status: b.status });
 };
 
