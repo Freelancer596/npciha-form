@@ -21,7 +21,7 @@ async function call(method, p, { body, cookie, admin = false, origin, headers = 
 }
 let tokN = 0;
 const uuid = () => `00000000-0000-4000-8000-${String(++tokN).padStart(12, '0')}`;
-const form = (o = {}) => ({ name: 'Test Member', father: 'Test Father', cnic: '42101-1234567-1', dob: '1990-05-17', religion: 'Islam', education: 'BA', designation: 'Member', wing: 'HRC', res: 'House 1, Dummy Road, Hyderabad', off: '', prof: 'Teacher', contact: '0300-1234567', email: 'dummy@example.com', photo: FX('photo.jpg'), token: uuid(), province_id: 1, district_id: 1, taluka_id: 1, ...o });
+const form = (o = {}) => ({ name: 'Test Member', father: 'Test Father', cnic: '42101-1234567-1', dob: '1990-05-17', religion: 'Islam', education: 'BA', designation: 'Member', wing: 'HRC', res: 'House 1, Dummy Road, Hyderabad', off: 'Office 1, Dummy Road, Hyderabad', prof: 'Teacher', contact: '0300-1234567', email: 'dummy@example.com', photo: FX('photo.jpg'), token: uuid(), province_id: 1, district_id: 1, taluka_name: 'Latifabad', ...o });
 const dump = async () => (await fetch(MOCK + '/__dump')).json();
 const mockCmd = p => fetch(MOCK + p);
 const login = async (u, pw) => { const r = await call('POST', '/api/admin/login', { body: { username: u, password: pw }, admin: true }); return { r, cookie: r.cookie.split(';')[0] }; };
@@ -299,9 +299,29 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   const dm = (await dump()).t.members.find(m => m.cnic === '42101-7000001-1');
   ok('stored row: province_id=1, district_id=1, taluka_name="Kandhkot"', dm && dm.province_id === 1 && dm.district_id === 1 && dm.taluka_name === 'Kandhkot', JSON.stringify(dm && [dm.province_id, dm.district_id, dm.taluka_name]));
   r = await call('POST', '/api/register', { body: form({ cnic: '42101-7000002-1', district_id: 4, taluka_name: '' }) });
-  ok('district without a taluka typed -> saved with taluka_name null', r.s === 201);
-  const dm2 = (await dump()).t.members.find(m => m.cnic === '42101-7000002-1');
-  ok('row stores taluka_name=null when left empty', dm2 && dm2.taluka_name === null && dm2.district_id === 4);
+  ok('district without a taluka typed -> rejected (taluka is required)', r.s === 422 && !!(r.j.fields && r.j.fields.taluka));
+  ok('rejected form stores nothing', !(await dump()).t.members.find(m => m.cnic === '42101-7000002-1'));
+
+  // ---- every field is required: leaving any ONE empty must stop the submission ----
+  {
+    await mockCmd('/__ratereset');
+    const { validateRegistration } = require('../lib/validate');
+    const fields = ['name', 'father', 'cnic', 'dob', 'education', 'designation', 'res', 'off', 'prof', 'contact', 'email', 'religion', 'wing'];
+    const missed = fields.filter(k => { const v = validateRegistration(form({ [k]: '' })); return v.ok || !v.errors[k]; });
+    ok('each of the 13 text/select fields left empty -> validation error on that field', missed.length === 0, missed.join(','));
+    ok('a completely filled form passes validation', validateRegistration(form()).ok);
+    const before = (await dump()).t.members.length;
+    r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100000-1', taluka_name: '' }) });
+    ok('empty taluka -> rejected with an error on taluka', r.s === 422 && !!(r.j.fields && r.j.fields.taluka));
+    r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100000-1', district_id: null }) });
+    ok('empty district -> rejected with an error on district', r.s === 422 && !!(r.j.fields && r.j.fields.district));
+    r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100000-1', photo: '' }) });
+    ok('missing photo -> rejected', r.s === 422 || r.s === 400);
+    ok('none of those incomplete forms was saved', (await dump()).t.members.length === before);
+    r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100000-1' }) });
+    ok('the same form with every field filled is accepted', r.s === 201);
+    await mockCmd('/__ratereset');
+  }
 
   // ---- office level / area (District / Taluka / City <post>) ----
   r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100001-1', designation: 'Taluka Media Adviser', office_level: 'taluka', office_area: 'Kandhkot', taluka_name: 'Kandhkot' }) });

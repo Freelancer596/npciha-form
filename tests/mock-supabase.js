@@ -66,6 +66,7 @@ function body(req) { return new Promise(r => { const c = []; req.on('data', d =>
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__reset') { reset(); res.end('ok'); return; }
+  if (u.pathname === '/__ratereset') { state.rate.clear(); res.end('ok'); return; }
   if (u.pathname === '/__fail') { state.fail = u.searchParams.get('mode') || null; res.end('ok'); return; }
   if (u.pathname === '/__dump') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ t: state.t, files: [...state.files.keys()] })); return; }
   if (req.headers.apikey !== KEY) return dbErr(res, 401, 'PGRST301', 'Invalid API key');
