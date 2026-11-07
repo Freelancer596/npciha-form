@@ -358,6 +358,47 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
     ok('sheet: when not configured nothing is sent and registration still works', r.s === 201 && hooks.length === before);
   }
 
+  // ---- Google Sheet via the direct Sheets API: banner/header rows stay, only the member rows are rewritten ----
+  {
+    const { privateKey } = require('crypto').generateKeyPairSync('rsa', { modulusLength: 2048 });
+    process.env.GOOGLE_SHEETS_SPREADSHEET_ID = 'SHEETID'; process.env.GOOGLE_SHEETS_TAB_NAME = 'Applications';
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: 'bot@example.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }) });
+    const hdr = ['Reference No', 'Application Date', 'Name', 'Father Name', 'CNIC', 'Date of Birth', 'Religion', 'Education', 'Designation', 'Wing', 'Residence Address', 'Office Address', 'Profession', 'Contact Number', 'Email', 'Province', 'District', 'Taluka', 'Status', 'Image / Photo', 'Office Level', 'Office Area'];
+    let grid; const resetGrid = () => { grid = [[], [], ['', '', 'NPCIH-A MEMBERS RECORDS'], ['', '', '=COUNTA(A7:A1011)'], ['‎'], hdr.slice(), ['0001', 'OLD', 'Stale One'], ['0002', 'OLD', 'Stale Two'], ['0003', 'OLD', 'Stale Three'], ['0004', 'OLD', 'Stale Four']]; };
+    const realFetch = global.fetch; resetGrid();
+    global.fetch = async (u, o) => {
+      u = String(u); const json = x => ({ ok: true, status: 200, json: async () => x, text: async () => JSON.stringify(x) });
+      if (u.startsWith('https://oauth2.googleapis.com/token')) return json({ access_token: 'tok', expires_in: 3600 });
+      if (u.startsWith('https://sheets.googleapis.com/v4/spreadsheets/SHEETID/values/')) {
+        const rest = decodeURIComponent(u.split('/values/')[1]); const clear = /:clear/.test(rest); const range = rest.replace(/\?.*$/, '').replace(/:clear$/, '');
+        const m = /!A(\d+)(?::[A-Z]+(\d*))?$/.exec(range); const row = +m[1];
+        if (clear) { for (let i = row - 1; i < grid.length; i++) grid[i] = []; return json({}); }
+        if ((o && o.method) === 'PUT') { JSON.parse(o.body).values.forEach((v, i) => { grid[row - 1 + i] = v; }); return json({}); }
+        return json({ values: grid.slice(row - 1, +m[2] || grid.length).map(r => [r[0] === undefined ? '' : r[0]]) });
+      }
+      return realFetch(u, o);
+    };
+    const total = () => state.t.members.length;
+    r = await call('POST', '/api/register', { body: form({ name: 'Api Person', cnic: '42101-6666666-6', designation: 'Member', province_id: 1, district_id: 1, taluka_name: 'Latifabad' }) });
+    ok('sheets api: registration still succeeds', r.s === 201);
+    ok('sheets api: banner, totals formula and custom header text are untouched', grid[2][2] === 'NPCIH-A MEMBERS RECORDS' && grid[3][2] === '=COUNTA(A7:A1011)' && grid[5][13] === 'Contact Number');
+    const body = grid.slice(6).filter(x => x.length);
+    ok('sheets api: member rows start right below the header and contain every member', body.length === total() && body.every(x => x.length === 22));
+    ok('sheets api: stale old rows are gone (no leftover below the last member)', !JSON.stringify(grid).includes('Stale') && grid.length === 6 + total());
+    const me = body.find(x => x[2] === 'Api Person');
+    ok('sheets api: full names, status and photo path are written', me && me[15] === 'Sindh' && me[16] === 'Hyderabad' && me[17] === 'Latifabad' && me[18] === 'Pending' && /^members\/.+\.jpg$/.test(me[19]));
+    ok('sheets api: reference numbers stay text with leading zeros', body.every(x => typeof x[0] === 'string' && x[0].length >= 4));
+    // unknown content and no header row -> never overwritten
+    grid = [['Some other table'], ['x']]; const snapshot = JSON.stringify(grid);
+    r = await call('POST', '/api/register', { body: form({ name: 'Api Person Two', cnic: '42101-5555555-5', designation: 'Member' }) });
+    ok('sheets api: a tab without the header row is left untouched and registration still works', r.s === 201 && JSON.stringify(grid) === snapshot);
+    // brand-new empty tab -> our header in row 1
+    grid = [];
+    r = await call('POST', '/api/register', { body: form({ name: 'Api Person Three', cnic: '42101-4444444-0', designation: 'Member' }) });
+    ok('sheets api: an empty tab gets the header in row 1 and the members below', r.s === 201 && grid[0][0] === 'Reference No' && grid[0][15] === 'Province' && grid.length === 1 + total());
+    delete process.env.GOOGLE_SHEETS_SPREADSHEET_ID; delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON; delete process.env.GOOGLE_SHEETS_TAB_NAME; global.fetch = realFetch;
+  }
+
   // ---- summary ----
   const passed = results.filter(x => x.pass).length, failed = results.length - passed;
   console.log(`\n=== ${passed} passed, ${failed} failed, ${results.length} total ===`);

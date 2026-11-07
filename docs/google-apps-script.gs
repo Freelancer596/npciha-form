@@ -22,18 +22,31 @@ function doPost(e) {
     if (!SECRET || d.secret !== SECRET) return out({ ok: false, error: 'bad_secret' });
     var rows = d.rows && d.rows.length ? d.rows : (d.row && d.row.length ? [d.row] : []);
     var ss0 = SpreadsheetApp.getActiveSpreadsheet();
-    if (d.mode === 'replace') {                       // full refresh: write header + every member, drop what is left below
+    if (d.mode === 'replace') {                       // full refresh of the member rows
       var sh0 = ss0.getSheetByName(TAB) || ss0.insertSheet(TAB);
-      var all = [d.headers].concat(d.rows || []);
-      var width0 = d.headers.length;
-      var rng0 = sh0.getRange(1, 1, all.length, width0);
-      rng0.setNumberFormat('@');                      // keep CNIC / phone / dates exactly as sent (text)
-      rng0.setValues(all);
-      var lastRow = sh0.getLastRow();
-      if (lastRow > all.length) sh0.getRange(all.length + 1, 1, lastRow - all.length, sh0.getMaxColumns()).clearContent();
-      sh0.setFrozenRows(1);
-      sh0.getRange(1, 1, 1, width0).setFontWeight('bold');
-      return out({ ok: true, mode: 'replace', written: (d.rows || []).length });
+      var width0 = d.headers.length, data = d.rows || [];
+      // the tab may have its own banner / totals above the table: find the header row ("Reference No") and
+      // rewrite only the rows below it, leaving everything above (title, totals, header text, colours) alone
+      var colA = sh0.getRange(1, 1, Math.min(30, sh0.getMaxRows()), 1).getValues(), headerRow = 0, anyText = false;
+      for (var k = 0; k < colA.length; k++) {
+        var cellText = String(colA[k][0]).replace(/[\u200e\u200f\s]+/g, ' ').trim().toLowerCase();
+        if (cellText) anyText = true;
+        if (cellText === 'reference no') { headerRow = k + 1; break; }
+      }
+      if (!headerRow) {
+        if (anyText) return out({ ok: false, error: 'header_row_not_found' });   // never overwrite unknown content
+        sh0.getRange(1, 1, 1, width0).setValues([d.headers]).setFontWeight('bold');
+        headerRow = 1;
+      }
+      var start = headerRow + 1;
+      if (data.length) {
+        var rng0 = sh0.getRange(start, 1, data.length, width0);
+        rng0.setNumberFormat('@');                    // keep CNIC / phone / dates exactly as sent (text)
+        rng0.setValues(data);
+      }
+      var lastRow = sh0.getLastRow(), after = start + data.length;
+      if (lastRow >= after) sh0.getRange(after, 1, lastRow - after + 1, width0).clearContent();
+      return out({ ok: true, mode: 'replace', written: data.length });
     }
     if (!rows.length) return out({ ok: false, error: 'no_row' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
