@@ -419,6 +419,24 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
     delete process.env.GOOGLE_SHEETS_SPREADSHEET_ID; delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON; delete process.env.GOOGLE_SHEETS_TAB_NAME; global.fetch = realFetch;
   }
 
+  // ---- photo link for the Google Sheet (=IMAGE(...)) ----
+  {
+    await mockCmd('/__ratereset');
+    const reg = await call('POST', '/api/register', { body: form({ cnic: '42101-8200000-1' }) });
+    const mem = (await dump()).t.members.find(m => m.cnic === '42101-8200000-1');
+    const pr = await fetch(BASE + '/api/photo?p=' + encodeURIComponent(mem.photo_path));
+    const bytes = Buffer.from(await pr.arrayBuffer());
+    ok('photo link: returns the exact stored photo as image/jpeg, no login needed', reg.s === 201 && pr.status === 200 && /^image\/jpeg/.test(pr.headers.get('content-type')) && bytes.equals(fs.readFileSync(path.join(__dirname, 'fixtures/photo.jpg'))));
+    ok('photo link: can be fetched from another site (Google) and cached', pr.headers.get('cross-origin-resource-policy') === 'cross-origin' && /max-age/.test(pr.headers.get('cache-control')));
+    for (const bad of ['', 'members/', '../members/x.jpg', 'members/../setup.js', 'members/not-a-uuid.jpg', 'other/00000000-0000-4000-8000-000000000001.jpg', 'members/00000000-0000-4000-8000-000000000001.png']) {
+      r = await call('GET', '/api/photo?p=' + encodeURIComponent(bad)); if (r.s !== 404) { ok('photo link: rejects "' + bad + '" (404)', false, String(r.s)); }
+    }
+    ok('photo link: anything that is not members/<uuid>.jpg is refused (404)', true);
+    r = await call('GET', '/api/photo?p=members/00000000-0000-4000-8000-000000000001.jpg'); ok('photo link: unknown photo -> 404', r.s === 404);
+    r = await call('POST', '/api/photo?p=' + encodeURIComponent(mem.photo_path), { body: {} }); ok('photo link: POST not allowed (405)', r.s === 405);
+    await mockCmd('/__ratereset');
+  }
+
   // ---- summary ----
   const passed = results.filter(x => x.pass).length, failed = results.length - passed;
   console.log(`\n=== ${passed} passed, ${failed} failed, ${results.length} total ===`);
