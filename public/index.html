@@ -109,7 +109,8 @@ label.req::after,label:has(+input[required])::after,label:has(+select[required])
 <div class="row"><div><label>Designation <span>عہدہ</span></label><input id="designation" type="text" required maxlength="100" placeholder="" list="des_list" autocomplete="off" autocapitalize="words"><datalist id="des_list"><option value="Chairman"><option value="Vice Chairman"><option value="Patron"><option value="President"><option value="Vice President"><option value="Senior Vice President"><option value="General Secretary"><option value="Joint Secretary"><option value="Deputy Secretary"><option value="Secretary"><option value="Finance Secretary"><option value="Information Secretary"><option value="Organizer"><option value="Joint Organizer"><option value="Coordinator"><option value="Focal Person"><option value="Spokesperson"><option value="Legal Advisor"><option value="Advisor"><option value="Treasurer"><option value="Executive Member"><option value="Member"></datalist><small style="display:block;margin-top:7px;padding:7px 9px;color:#B22222;background:#FFF1F1;border-left:3px solid #B22222;border-radius:4px;font-size:12px;font-weight:700;line-height:1.7;direction:rtl;text-align:right">جس سطح پر آپ عہدہ رکھتے ہیں، وہ سطح اپنے عہدے کے ساتھ لازمی لکھیں، مثلاً: ضلعی، تعلقہ یا سٹی۔</small></div>
 <div><label>Wing <span>ونگ</span></label><select id="wing" required><option>HRC</option></select></div></div>
 <div class="row"><div><label>Province <span>صوبہ</span></label><input id="prov" value="Sindh" readonly></div><div><label>District <span>ضلع</span></label><input id="dist" required list="dist_list" placeholder="Search or select district" autocomplete="off"><datalist id="dist_list"></datalist></div></div><label>Taluka <span>تحصیل</span></label><input id="tal" required list="tal_list" placeholder="Type or select taluka" autocomplete="off"><datalist id="tal_list"></datalist><div class="msg" id="locm"></div>
-<div id="lvlbox" class="hide"><label>Office Level <span>عہدے کی سطح</span></label><select id="lvl"></select><div class="msg" id="lvlm"></div></div>
+<div class="row"><div><label>Office Level <span>عہدے کی سطح</span></label><select id="lvl" required><option value="" disabled selected>Select office level</option><option value="provincial">Provincial</option><option value="district">District</option><option value="taluka">Taluka</option><option value="city">City</option><option value="member">Member</option></select></div>
+<div id="areabox"><label>Office Area <span>دفتر کا علاقہ</span></label><input id="oarea" required maxlength="100" placeholder="e.g. Kashmore" autocomplete="off" autocapitalize="words"></div></div>
 <label>Residence Address <span>مستقل پتہ</span></label><input id="res" required autocapitalize="words">
 <label>Office Address <span>دفتر کا پتہ</span></label><input id="off" required autocapitalize="words">
 <div class="row"><div><label>Profession <span>کاروبار</span></label><input id="prof" required list="prof_list" autocomplete="off" autocapitalize="words" maxlength="100"><datalist id="prof_list"><option value="Business"><option value="Businessman"><option value="Student"><option value="Teacher"><option value="Lecturer"><option value="Professor"><option value="Doctor"><option value="Lawyer"><option value="Advocate"><option value="Engineer"><option value="Farmer"><option value="Shopkeeper"><option value="Trader"><option value="Contractor"><option value="Social Worker"><option value="Journalist"><option value="Government Employee"><option value="Private Job"><option value="Banker"><option value="Accountant"><option value="Driver"><option value="Labourer"><option value="Housewife"><option value="Retired"><option value="Imam"><option value="Politician"><option value="Unemployed"></datalist></div>
@@ -180,8 +181,14 @@ function onDist(){const raw=$("dist").value;const d=findByName(LOC.districts,raw
 $("dist").addEventListener("input",onDist);$("dist").addEventListener("change",onDist);
 const talName=()=>{const raw=$("tal").value.trim();const t=findByName(LOC.talukas,raw);return t?t.name:raw};
 $("tal").addEventListener("change",()=>{const t=findByName(LOC.talukas,$("tal").value);if(t)$("tal").value=t.name});
-/* Designation is free text; no preset post or office-level options. */
-function officeInfo(){const designation=$("designation").value.replace(/\s+/g," ").trim();return designation?{designation:designation,level:"",area:""}:null}
+/* Designation is free text. Office Level and Office Area are separate required fields.
+   Area is pre-filled from the chosen province / district / taluka (still editable); a plain "Member" has no area. */
+let AUTO="";
+function autoArea(){const l=$("lvl").value;if(l==="provincial")return $("prov").value||"Sindh";if(l==="district"){const d=findByName(LOC.districts,$("dist").value);return d?d.name:""}if(l==="taluka")return talName();return ""}
+function refreshLvl(){const mem=$("lvl").value==="member";$("areabox").classList.toggle("hide",mem);$("oarea").required=!mem;if(mem){$("oarea").value="";AUTO="";return}const a=autoArea(),cur=$("oarea").value;if(!cur.trim()||cur===AUTO)$("oarea").value=a;AUTO=a}
+$("lvl").addEventListener("change",refreshLvl);
+["dist","tal"].forEach(id=>{$(id).addEventListener("input",refreshLvl);$(id).addEventListener("change",refreshLvl)});
+function officeInfo(){const designation=$("designation").value.replace(/\s+/g," ").trim();if(!designation)return null;const level=$("lvl").value,area=level==="member"?"":$("oarea").value.replace(/\s+/g," ").trim();return{designation:designation,level:level,area:area}}
 initLoc();
 $("cnic").addEventListener("input",()=>{TOK=uuid()});
 $("cnic").oninput=e=>{let v=e.target.value.replace(/\D/g,"").slice(0,13);e.target.value=v.length>12?v.slice(0,5)+"-"+v.slice(5,12)+"-"+v.slice(12):v.length>5?v.slice(0,5)+"-"+v.slice(5):v};
@@ -191,6 +198,8 @@ $("go").onclick=async()=>{const f=$("f");if(!f.reportValidity())return;if(!$("pv
  if(!LOC.district_id){locMsg("Select a district from the list.",true);$("dist").focus();return}
  if(!talName()){locMsg("Please enter your taluka.",true);$("tal").focus();return}
  const OFF=officeInfo();if(!OFF){$("msg").textContent="Please enter your designation."; $("designation").focus();return}
+ if(!OFF.level){$("msg").textContent="Please select your office level.";$("lvl").focus();return}
+ if(OFF.level!=="member"&&!OFF.area){$("msg").textContent="Please enter your office area.";$("oarea").focus();return}
  const GO0="Submit & Generate PDF",setGo=t=>{$("go").textContent=t};$("go").disabled=true;setGo("⏳ Saving… / محفوظ ہو رہا ہے");$("msg").textContent="";
  const q={name:$("name").value,father:$("father").value,cnic:$("cnic").value,dob:$("dob").value,religion:$("religion").value,education:$("education").value,designation:$("designation").value,wing:$("wing").value,res:$("res").value,off:$("off").value,prof:$("prof").value,contact:$("contact").value,email:$("email").value,photo:$("pv").src,token:TOK,province_id:LOC.province_id,district_id:LOC.district_id,taluka_name:talName(),office_level:OFF.level,office_area:OFF.area};
  const R=await api("register",{method:"POST",json:q});

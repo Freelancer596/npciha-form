@@ -21,7 +21,7 @@ async function call(method, p, { body, cookie, admin = false, origin, headers = 
 }
 let tokN = 0;
 const uuid = () => `00000000-0000-4000-8000-${String(++tokN).padStart(12, '0')}`;
-const form = (o = {}) => ({ name: 'Test Member', father: 'Test Father', cnic: '42101-1234567-1', dob: '1990-05-17', religion: 'Islam', education: 'BA', designation: 'Member', wing: 'HRC', res: 'House 1, Dummy Road, Hyderabad', off: 'Office 1, Dummy Road, Hyderabad', prof: 'Teacher', contact: '0300-1234567', email: 'dummy@example.com', photo: FX('photo.jpg'), token: uuid(), province_id: 1, district_id: 1, taluka_name: 'Latifabad', ...o });
+const form = (o = {}) => ({ name: 'Test Member', father: 'Test Father', cnic: '42101-1234567-1', dob: '1990-05-17', religion: 'Islam', education: 'BA', designation: 'Member', wing: 'HRC', res: 'House 1, Dummy Road, Hyderabad', off: 'Office 1, Dummy Road, Hyderabad', prof: 'Teacher', contact: '0300-1234567', email: 'dummy@example.com', photo: FX('photo.jpg'), token: uuid(), province_id: 1, district_id: 1, taluka_name: 'Latifabad', office_level: 'taluka', office_area: 'Latifabad', ...o });
 const dump = async () => (await fetch(MOCK + '/__dump')).json();
 const mockCmd = p => fetch(MOCK + p);
 const login = async (u, pw) => { const r = await call('POST', '/api/admin/login', { body: { username: u, password: pw }, admin: true }); return { r, cookie: r.cookie.split(';')[0] }; };
@@ -306,9 +306,9 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   {
     await mockCmd('/__ratereset');
     const { validateRegistration } = require('../lib/validate');
-    const fields = ['name', 'father', 'cnic', 'dob', 'education', 'designation', 'res', 'off', 'prof', 'contact', 'email', 'religion', 'wing'];
+    const fields = ['name', 'father', 'cnic', 'dob', 'education', 'designation', 'res', 'off', 'prof', 'contact', 'email', 'religion', 'wing', 'office_level', 'office_area'];
     const missed = fields.filter(k => { const v = validateRegistration(form({ [k]: '' })); return v.ok || !v.errors[k]; });
-    ok('each of the 13 text/select fields left empty -> validation error on that field', missed.length === 0, missed.join(','));
+    ok('each of the 15 text/select fields left empty -> validation error on that field', missed.length === 0, missed.join(','));
     ok('a completely filled form passes validation', validateRegistration(form()).ok);
     const before = (await dump()).t.members.length;
     r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100000-1', taluka_name: '' }) });
@@ -333,9 +333,13 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('member level saves with an empty area', r.s === 201 && om2 && om2.office_level === 'member' && om2.office_area === null, JSON.stringify(om2 && [om2.office_level, om2.office_area]));
   await bad('office level not in the list', { cnic: '42101-7100003-1', office_level: 'galaxy', office_area: 'X' }, 'office_level');
   await bad('district-level post without an area', { cnic: '42101-7100004-1', office_level: 'district', office_area: '' }, 'office_area');
-  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100005-1' }) });
-  const om3 = (await dump()).t.members.find(m => m.cnic === '42101-7100005-1');
-  ok('older form without level/area still saves (both null)', r.s === 201 && om3 && om3.office_level === null && om3.office_area === null);
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100005-1', office_level: '', office_area: '' }) });
+  ok('form without office level/area is rejected (both are required)', r.s === 422 && !!(r.j.fields && r.j.fields.office_level && r.j.fields.office_area));
+  ok('rejected form without level/area stores nothing', !(await dump()).t.members.find(m => m.cnic === '42101-7100005-1'));
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100006-1', office_level: 'city', office_area: '' }) });
+  ok('city-level post without an area is rejected', r.s === 422 && !!(r.j.fields && r.j.fields.office_area));
+  r = await call('POST', '/api/register', { body: form({ cnic: '42101-7100007-1', office_level: 'provincial', office_area: 'Sindh' }) });
+  ok('provincial level with area Sindh is accepted', r.s === 201);
 
   // ---- secrets scan ----
   const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(path.join(dir, e.name))) : [path.join(dir, e.name)]);
