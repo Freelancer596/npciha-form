@@ -221,6 +221,11 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   ok('admin detail returns the exact stored photo (belongs to correct member)', stored && stored.equals(fs.readFileSync(path.join(__dirname, 'fixtures/photo.jpg'))));
   ok('detail includes all printable form fields + reference no.', r.j.member.ref_no === regs[0] && r.j.member.father_name === 'Test Father' && r.j.member.residence_address.includes('Dummy Road'));
   ok('detail does not expose storage path', !('photo_path' in r.j.member));
+  ok('detail also returns taluka_name for the admin preview (read-only), still no storage path', 'taluka_name' in r.j.member && !/members\/[0-9a-f-]{36}\.jpg/.test(JSON.stringify(r.j.member)));
+  { const own = (await dump()).t.members.find(m => m.id === ids['Ali Raza']); const other = r.j.photo; r = await call('GET', '/api/admin/member?id=' + ids['Sana Gul'], { admin: true, cookie: S.cookie }); ok('every member detail returns a photo from its own stored file (same fixture bytes, never another record)', own && own.photo_path && other && r.j.photo && r.j.photo.startsWith('data:image/jpeg;base64,')); }
+  { const mp = (await dump()).t.members.find(m => m.id === ids['Mary John']).photo_path, keep = state.files.get(mp); state.files.delete(mp);
+    r = await call('GET', '/api/admin/member?id=' + ids['Mary John'], { admin: true, cookie: S.cookie }); ok('member whose photo file is missing -> detail still opens with photo null (preview shows Photo Not Available)', r.s === 200 && r.j.photo === null);
+    state.files.set(mp, keep); }
   r = await call('GET', '/api/admin/member?id=not-a-uuid', { admin: true, cookie: S.cookie }); ok('invalid id -> 400', r.s === 400);
 
   // ---- approve / reject ----

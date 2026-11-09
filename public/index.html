@@ -95,6 +95,25 @@ nav button.on{background:linear-gradient(180deg,#d9bd7e,#a88746)!important;color
 
 label.req::after,label:has(+input[required])::after,label:has(+select[required])::after{content:" *";color:#B22222;font-weight:700}
 </style><link rel="prefetch" as="image" href="/assets/form.427c8c66.jpg">
+<style>
+/* Admin application preview: photo beside the details, full form below, photo zoom */
+#pvw{position:fixed;inset:0;z-index:60;background:rgba(10,18,10,.92);overflow:auto;-webkit-overflow-scrolling:touch;padding:10px}
+.pvbox{max-width:760px;margin:0 auto;background:var(--c);color:var(--t);border:1px solid var(--b);border-top:3px solid var(--g);box-shadow:0 2px 0 var(--au);padding:14px}
+.pvh{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--b);padding-bottom:10px}
+.pvh button{padding:9px 14px;border:1px solid var(--g);background:none;color:var(--g);font-weight:700;font-size:13px}.pvh button.dl{background:var(--g);color:#fff}.pvh button:disabled{opacity:.6}
+.pvtop{display:flex;gap:14px;align-items:flex-start;margin-top:12px}.pvd{flex:1;min-width:0}
+.pvd div{margin-bottom:7px}.pvd small{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--g);font-weight:700}.pvd span{display:block;font-size:14px;overflow-wrap:anywhere}
+.pvph{flex:none;width:118px;position:sticky;top:0}
+.pvfr{width:118px;height:152px;border:2px solid var(--au);background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pvfr img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}.pvfr .na{padding:8px;text-align:center;font-weight:700;font-size:13px;color:var(--m)}
+.pvph button{margin-top:6px;width:100%;padding:7px;border:1px solid var(--g);background:none;color:var(--g);font-weight:700;font-size:12px}
+@media(min-width:600px){.pvph,.pvfr{width:170px}.pvfr{height:219px}}
+.pvf{display:block;margin:16px 0 6px;color:var(--g);letter-spacing:1px}.pvbox canvas{width:100%;display:block;border:1px solid var(--b)}
+#pvz{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.96);display:flex;flex-direction:column}
+.pvzb{display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#111;border-bottom:2px solid var(--au);flex:none}
+.pvzb button{min-width:44px;padding:9px 14px;border:1px solid var(--au);background:none;color:#fff;font-weight:700;font-size:16px}.pvzl{color:#e8dca8;min-width:52px;text-align:center;font-size:14px}
+.pvzs{flex:1;overflow:auto;display:flex;-webkit-overflow-scrolling:touch}#pvz img{margin:auto;display:block;max-width:none;height:auto;flex:none}
+</style>
 </head><body><div id="npciha-logo-intro" role="dialog" aria-label="NPCIH-A Pakistan cinematic introduction" aria-modal="true"><div class="npciha-intro-inner"><img id="npciha-intro-logo" alt="NPCIH-A original emblem"><div class="npciha-intro-title">NPCIH-A PAKISTAN</div><div class="npciha-intro-region">SINDH</div><div class="npciha-intro-line"></div><div class="npciha-intro-sub">PROMOTING PEACE</div></div></div><canvas id="bg"></canvas>
 <header><img src="/assets/logo.629aad42.jpg" alt=""><div><h1>NPCIHA HRC Sindh</h1><small>Chairman HRC Sindh: Rahmatullah Khan Channa</small></div></header>
 
@@ -146,7 +165,7 @@ async function drawForm(m){
 async function pdf(m){const c=await drawForm(m); const J=window.jspdf.jsPDF,d=new J({unit:"mm",format:"a4"});
  /* Page 1: completed membership form */ d.addImage(c.toDataURL("image/jpeg",.92),"JPEG",0,0,210,210*c.height/c.width);
  /* Page 2: member photograph and application number */ d.addPage();d.setFontSize(16);d.setTextColor(11,107,46);d.text("NPCIH (A) - Membership Photo",105,30,{align:"center"});
- if(m.photo)d.addImage(m.photo,"JPEG",70,45,70,90);d.setDrawColor(11,107,46);d.rect(70,45,70,90);
+ if(m.photo)d.addImage(m.photo,"JPEG",70,45,70,90);else{d.setFontSize(12);d.setTextColor(110,110,110);d.text("Photo Not Available",105,92,{align:"center"})}d.setDrawColor(11,107,46);d.rect(70,45,70,90);
  d.setTextColor(0);d.setFontSize(13);d.text(m.name,105,148,{align:"center"});d.setFontSize(10);d.text("Application No: "+m.ref,105,156,{align:"center"});return d}
 let pdfUrl=null,pdfB64="",pdfName="",pdfRef=null,CUR=null;
 function revokePdf(){if(pdfUrl){URL.revokeObjectURL(pdfUrl);pdfUrl=null}}
@@ -223,7 +242,7 @@ const toM=(r,p)=>({ref:r.ref_no,date:kd(r.created_at),name:r.name,father:r.fathe
 const dName=id=>{const d=GEO.districts.find(x=>x.id===id);return d?d.name:"Unassigned"},tName=id=>{const t=GEO.talukas.find(x=>x.id===id);return t?t.name:"-"};
 function fillSel(sel,items,all,keep){const v=keep?sel.value:"";sel.textContent="";const o=document.createElement("option");o.value="";o.textContent=all;sel.append(o);items.forEach(i=>{const e=document.createElement("option");e.value=i[0];e.textContent=i[1];sel.append(e)});sel.value=v}
 function fillTal(sel,did,all){fillSel(sel,GEO.talukas.filter(t=>t.active&&String(t.district_id)===String(did)).map(t=>[t.id,t.name]),all)}
-function showLock(msg){ME=null;$("lock").classList.remove("hide");$("adm").classList.add("hide");$("list").textContent="";$("pwm").textContent=msg||""}
+function showLock(msg){pvClose();ME=null;$("lock").classList.remove("hide");$("adm").classList.add("hide");$("list").textContent="";$("pwm").textContent=msg||""}
 const gone=R=>{if(R.r&&R.r.status===401){showLock("Session ended. Please sign in again.");return true}return false};
 async function enter(){const R=await api("admin/me");if(!R.j||!R.j.ok)return false;ME=R.j;const G=await api("admin/districts");if(G.j&&G.j.ok)GEO=G.j;
  const ds=GEO.districts.filter(d=>d.active).map(d=>[d.id,d.name]);if(ME.can.all_districts){fillSel($("fd"),ds.concat([["none","Unassigned"]]),"All districts")}else{fillSel($("fd"),ds,"All districts");$("fd").value=String(ME.user.district_id);$("fd").disabled=true;fillTal($("ft"),ME.user.district_id,"All talukas")}
@@ -237,8 +256,37 @@ async function loadM(reset){const L=$("list");if(reset){PG=0;L.textContent=""}$(
  R.j.members.forEach(x=>L.append(row(x)));PG+=R.j.members.length;$("fmsg").textContent=R.j.total+" member(s) found";
  if(PG<R.j.total){const b=document.createElement("button");b.className="btn o more";b.style.cssText="padding:9px;font-size:12px";b.textContent="Load more";b.onclick=()=>loadM(false);L.append(b)}}
 async function detail(id){const R=await api("admin/member?id="+id);if(gone(R))return null;if(!R.j||!R.j.ok){$("fmsg").textContent=R.j&&R.j.message||"Cannot load this member.";return null}return R.j}
+/* ===== Admin application preview: photo beside the details, the full form below, photo zoom, Download PDF ===== */
+const LVL_N={provincial:"Provincial",district:"District",taluka:"Taluka",city:"City",member:"Member"},ST_N={pending:"Pending",approved:"Approved",rejected:"Rejected"};
+const pvEl=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e};
+function pvClose(){const o=$("pvw"),z=$("pvz");if(o)o.remove();if(z)z.remove();document.body.style.overflow=""}
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if($("pvz")){$("pvz").remove();return}if($("pvw"))pvClose()});
+function openZoom(src,alt){const old=$("pvz");if(old)old.remove();
+ const z=pvEl("div"),bar=pvEl("div","pvzb"),sc=pvEl("div","pvzs"),im=new Image(),lab=pvEl("span","pvzl","100%");let k=1;z.id="pvz";im.alt=alt||"";
+ const set=n=>{const fx=(sc.scrollLeft+sc.clientWidth/2)/Math.max(sc.scrollWidth,1),fy=(sc.scrollTop+sc.clientHeight/2)/Math.max(sc.scrollHeight,1);k=Math.min(6,Math.max(1,n));const w=im.naturalWidth||1,h=im.naturalHeight||1;im.style.width=Math.round(Math.min(sc.clientWidth,sc.clientHeight*w/h)*k)+"px";im.style.cursor=k>1?"zoom-out":"zoom-in";sc.scrollLeft=fx*sc.scrollWidth-sc.clientWidth/2;sc.scrollTop=fy*sc.scrollHeight-sc.clientHeight/2;lab.textContent=Math.round(k*100)+"%"};
+ const mk=(t,f)=>{const b=pvEl("button","",t);b.onclick=f;return b};
+ bar.append(mk("\u2212",()=>set(k/1.4)),lab,mk("+",()=>set(k*1.4)),mk("Fit",()=>set(1)),mk("\u2715 Close",()=>z.remove()));
+ im.onclick=()=>set(k>1?1:2.5);im.onload=()=>{set(1);sc.scrollLeft=0;sc.scrollTop=0};
+ sc.addEventListener("wheel",e=>{e.preventDefault();set(k*(e.deltaY<0?1.15:1/1.15))},{passive:false});
+ window.addEventListener("resize",()=>{if(document.body.contains(z))set(k)});
+ sc.append(im);z.append(bar,sc);document.body.append(z);im.src=src}
+function openPreview(d){pvClose();const M=d.member,m=toM(M,d.photo);
+ const ov=pvEl("div"),box=pvEl("div","pvbox"),hd=pvEl("div","pvh"),ti=pvEl("div"),t1=pvEl("b","","APPLICATION PREVIEW / درخواست پریویو"),t2=pvEl("div","",M.ref_no+" \u2022 "+kd(M.created_at));ov.id="pvw";
+ t1.style.cssText="display:block;font-size:16px;letter-spacing:1px;color:var(--g)";t2.style.cssText="font-size:13px;color:var(--m)";ti.append(t1,t2);
+ const bt=pvEl("div"),dl=pvEl("button","dl","\u2B07 Download PDF"),cl=pvEl("button","","\u2715 Close");bt.style.cssText="display:flex;gap:8px";
+ dl.onclick=async()=>{dl.disabled=true;const t=dl.textContent;dl.textContent="\u23F3 PDF\u2026";try{await save(await pdf(m),m)}catch(e){alert("PDF could not be created: "+(e&&e.message||"unknown"))}dl.disabled=false;dl.textContent=t};
+ cl.onclick=pvClose;bt.append(dl,cl);hd.append(ti,bt);
+ const top=pvEl("div","pvtop"),dt=pvEl("div","pvd");
+ [["Application No.",M.ref_no],["Date",kd(M.created_at)],["Status",ST_N[M.status]||M.status],["Name",M.name],["Father Name",M.father_name],["CNIC",M.cnic],["Date of Birth",fmt(M.dob)],["Religion",M.religion],["Education",M.education],["Designation",M.designation],["Office Level",LVL_N[M.office_level]||""],["Office Area",M.office_area],["Wing",M.wing],["District",M.district_id?dName(M.district_id):""],["Taluka",M.taluka_name||(M.taluka_id?tName(M.taluka_id):"")],["Contact",M.contact],["E-mail",M.email],["Profession",M.profession],["Residence Address",M.residence_address],["Office Address",M.office_address]].forEach(([l,v])=>{const r=pvEl("div");r.append(pvEl("small","",l),pvEl("span","",v||"\u2014"));dt.append(r)});
+ const ph=pvEl("div","pvph"),fr=pvEl("div","pvfr");
+ if(d.photo){const im=new Image();im.src=d.photo;im.alt="Photo of "+M.name;im.onclick=()=>openZoom(d.photo,im.alt);fr.append(im);const zb=pvEl("button","","\uD83D\uDD0D Zoom photo");zb.onclick=()=>openZoom(d.photo,im.alt);ph.append(fr,zb)}
+ else{fr.append(pvEl("div","na","Photo Not Available"));ph.append(fr)}
+ top.append(ph,dt);
+ const fh=pvEl("b","pvf","MEMBERSHIP FORM / ممبرشپ فارم"),holder=pvEl("div","","Loading form\u2026");holder.style.cssText="color:var(--m);font-size:14px";
+ drawForm(m).then(c=>{holder.textContent="";holder.append(c)}).catch(()=>{holder.textContent="The form could not be drawn."});
+ box.append(hd,top,fh,holder);ov.append(box);ov.onclick=e=>{if(e.target===ov)pvClose()};document.body.append(ov);document.body.style.overflow="hidden";ov.scrollTop=0}
 function row(x){const w=document.createElement("div"),r=document.createElement("div");r.className="m";const t=document.createElement("div");const stl={pending:"⏳ زیر غور",approved:"✅ منظور",rejected:"❌ مسترد"}[x.status]||x.status;r.style.cssText="flex-direction:column;align-items:stretch;padding:12px 0";t.style.cssText="line-height:1.6";t.innerHTML="";const b1=document.createElement("b");b1.textContent=x.name;const d1=document.createElement("div");d1.style.cssText="font-size:13px;color:var(--m)";d1.textContent=x.cnic+" • "+x.contact;const d2=document.createElement("div");d2.style.cssText="font-size:13px";d2.textContent=stl+" • "+x.ref_no;t.append(b1,d1,d2);
- const v=document.createElement("button");v.textContent="👁 دیکھیں";v.onclick=async()=>{const d=await detail(x.id);if(!d)return;const c=await drawForm(toM(d.member,d.photo)),p=$("pr");p.width=c.width;p.height=c.height;p.getContext("2d").drawImage(c,0,0);p.style.display="block";p.scrollIntoView({behavior:"smooth"})};
+ const v=document.createElement("button");v.textContent="👁 دیکھیں";v.onclick=async()=>{v.disabled=true;const d=await detail(x.id);v.disabled=false;if(!d)return;openPreview(d)};
  const b=document.createElement("button");b.textContent="📄 PDF";b.onclick=async()=>{const d=await detail(x.id);if(!d)return;const m=toM(d.member,d.photo);save(await pdf(m),m)};
  const mg=document.createElement("button");mg.textContent="⚙ مزید";const pn=document.createElement("div");pn.className="hide";pn.style.cssText="padding:8px 0;border-bottom:1px solid var(--b)";mg.onclick=()=>{pn.classList.toggle("hide");if(!pn.dataset.b){pn.dataset.b=1;panel(pn,x)}};
  const g=document.createElement("div");g.style.cssText="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start";g.append(v,b);if(ME&&ME.can&&ME.can.status&&x.status!=="approved"){const ap=document.createElement("button");ap.textContent="✅ منظور";ap.onclick=async()=>{if(!confirm("Approve / منظور کریں؟\n"+x.name+" ("+x.ref_no+")"))return;const R=await api("admin/status",{method:"POST",json:{id:x.id,status:"approved",note:""}});if(gone(R))return;if(R.j&&R.j.ok){await loadM(true)}else $("fmsg").textContent=R.j&&R.j.message||"Failed."};g.append(ap)}g.append(mg);r.append(t,g);w.append(r,pn);return w}
