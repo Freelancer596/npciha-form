@@ -299,6 +299,20 @@ function panel(pn,x){const info=document.createElement("div");info.className="ms
  pn.append(mini("Save district / taluka",async()=>{if(!ds.value){say("Choose a district first.");return}const j={taluka_id:ts.value||null};if(ME.can.reassign)j.district_id=+ds.value;else if(x.district_id!==ME.user.district_id){say("This record has no district.");return}done(await api("admin/member?id="+x.id,{method:"PATCH",json:j}),"Assignment saved.")}));
  const fs=document.createElement("select");fs.style.marginTop="8px";[["name","Name"],["father","Father name"],["dob","Date of birth (YYYY-MM-DD)"],["religion","Religion"],["education","Education"],["designation","Designation"],["wing","Wing"],["res","Residence address"],["off","Office address"],["prof","Profession"],["contact","Mobile"],["email","E-mail"]].concat(ME.can.cnic_search?[["cnic","CNIC"]]:[]).forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent="Edit: "+l;fs.append(o)});pn.append(fs);
  pn.append(mini("Change selected field",async()=>{const v=prompt("New value for "+fs.options[fs.selectedIndex].text.replace("Edit: ",""));if(v===null)return;done(await api("admin/member?id="+x.id,{method:"PATCH",json:{[fs.value]:v}}),"Field updated.")}));
+ /* Change photo: choose -> preview -> Save / Cancel (the photo is shrunk to a passport-size JPEG like at registration) */
+ const pf=document.createElement("input");pf.type="file";pf.accept="image/*";pf.className="hide";
+ const pw=document.createElement("div");pw.className="hide";pw.style.marginTop="8px";
+ const pi=document.createElement("img");pi.alt="New photo";pi.style.cssText="display:block;width:110px;max-width:40%;border:1px solid var(--b);border-radius:6px;margin-bottom:6px";
+ let np="";const clr=()=>{np="";pf.value="";pi.removeAttribute("src");pw.classList.add("hide")};
+ pf.onchange=async()=>{const f=pf.files&&pf.files[0];if(!f)return;
+  if(f.type&&!/^image\/(jpeg|png|webp|gif|heic|heif)$/i.test(f.type)||f.size>25*1048576){clr();say("Please choose a JPG, PNG or WebP photo under 25 MB.");return}
+  say("Processing photo…");try{np=await shrink(f);pi.src=np;pw.classList.remove("hide");say("Check the new photo, then tap Save new photo.")}catch(e){clr();say("Could not read this photo. Try another one.")}};
+ const pr=document.createElement("div");pr.className="row";
+ pr.append(mini("Save new photo",async()=>{if(!np){say("Choose a photo first.");return}if(!confirm("Replace the photo of "+x.name+" ("+x.ref_no+")?"))return;
+  const R=await api("admin/member?id="+x.id,{method:"PATCH",json:{photo:np}});if(gone(R))return;
+  if(R.j&&R.j.ok){clr();await loadM(true);$("fmsg").textContent="Photo updated. / تصویر تبدیل ہو گئی۔";$("fmsg").scrollIntoView({block:"nearest"})}else say(R.j&&R.j.message||"Failed.")}),mini("Cancel",()=>{clr();say("Photo change cancelled.")}));
+ pw.append(pi,pr);
+ if(ME.can.edit!==false)pn.append(mini("📷 Change photo / تصویر تبدیل کریں",()=>pf.click()),pf,pw);
  if(ME.can.remove)pn.append(mini("Delete record",async()=>{if(!confirm("Permanently delete "+x.name+" ("+x.ref_no+")? This cannot be undone."))return;if(prompt('Type DELETE to confirm')!=="DELETE"){say("Delete cancelled.");return}done(await api("admin/member?id="+x.id,{method:"DELETE",json:{confirm:"DELETE"}}),"Record deleted.")}))}
 $("fd").onchange=()=>fillTal($("ft"),$("fd").value,"All talukas");
 $("fgo").onclick=()=>loadM(true);$("fq").onkeydown=e=>{if(e.key==="Enter")loadM(true)};

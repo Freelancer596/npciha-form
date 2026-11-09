@@ -241,6 +241,50 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { status: 'approved', ref_no: 'HACK', photo_path: 'x' }, admin: true, cookie: S.cookie }); ok('mass-assignment of status/ref/photo via edit ignored (400/422)', r.s === 422);
   d = await dump(); ok('reference number unchanged after attempted overwrite', d.t.members.find(m => m.name === 'Ali Raza').ref_no === regs[0]);
 
+  // ---- admin changes a member's photo ----
+  {
+    const orig = fs.readFileSync(path.join(__dirname, 'fixtures/photo.jpg'));
+    const alt = Buffer.concat([orig.slice(0, 2), Buffer.from([0xFF, 0xFE, 0x00, 0x08, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46]), orig.slice(2)]); // still a valid JPEG, different bytes
+    const altUri = 'data:image/jpeg;base64,' + alt.toString('base64');
+    const memberOf = async id => (await dump()).t.members.find(m => m.id === id);
+    const before = await dump(), oldPath = (await memberOf(ids['Ali Raza'])).photo_path;
+
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: altUri }, admin: true, cookie: S.cookie });
+    ok('admin can change a member photo (photo only, 200)', r.s === 200 && r.j.updated.includes('photo'), r.text);
+    d = await dump(); const nm = d.t.members.find(m => m.id === ids['Ali Raza']);
+    ok('member row points to a NEW photo file and the new bytes are stored', nm.photo_path !== oldPath && /^members\/[0-9a-f-]{36}\.jpg$/.test(nm.photo_path) && state.files.get(nm.photo_path) && Buffer.from(state.files.get(nm.photo_path)).equals(alt));
+    ok('old photo file is removed (no orphan, same number of files)', !d.files.includes(oldPath) && d.files.length === before.files.length);
+    ok('other members keep their own photos', d.t.members.filter(m => m.id !== ids['Ali Raza']).every(m => d.files.includes(m.photo_path)));
+    r = await call('GET', '/api/admin/member?id=' + ids['Ali Raza'], { admin: true, cookie: S.cookie });
+    ok('admin detail now returns the new photo', r.j.photo === altUri);
+    ok('audit log records "photo" as a changed field (not the image)', JSON.stringify((await dump()).t.audit_log.filter(a => a.action === 'update_member').slice(-1)).includes('photo') && !JSON.stringify((await dump()).t.audit_log).includes('base64'));
+
+    const cur = (await memberOf(ids['Ali Raza'])).photo_path, files0 = (await dump()).files.length;
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: FX('mid.jpg') }, admin: true, cookie: S.cookie }); ok('oversize photo rejected (422)', r.s === 422 && r.j.fields && r.j.fields.photo);
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: FX('photo.jpg').replace('image/jpeg', 'image/png') }, admin: true, cookie: S.cookie }); ok('PNG photo rejected (422)', r.s === 422);
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: 'data:image/jpeg;base64,' + Buffer.from('hello world '.repeat(80)).toString('base64') }, admin: true, cookie: S.cookie }); ok('fake JPEG photo rejected (422)', r.s === 422);
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: '' }, admin: true, cookie: S.cookie }); ok('empty photo rejected (422) - photo cannot be removed', r.s === 422);
+    d = await dump(); ok('rejected photos change nothing (same file, no extra files)', (await memberOf(ids['Ali Raza'])).photo_path === cur && d.files.length === files0);
+
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: FX('photo.jpg'), prof: 'Doctor' }, admin: true, cookie: S.cookie });
+    ok('photo and a text field can be changed together', r.s === 200 && r.j.updated.includes('photo') && r.j.updated.includes('profession'), r.text);
+    ok('...and both are saved', (await memberOf(ids['Ali Raza'])).profession === 'Doctor' && Buffer.from(state.files.get((await memberOf(ids['Ali Raza'])).photo_path)).equals(orig));
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: altUri, contact: 'abc' }, admin: true, cookie: S.cookie });
+    d = await dump(); ok('invalid text field + good photo: 422 and the photo is NOT stored', r.s === 422 && d.files.length === files0 && Buffer.from(state.files.get((await memberOf(ids['Ali Raza'])).photo_path)).equals(orig));
+
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Dilip Kumar'], { body: { photo: altUri }, admin: true, cookie: HA.cookie });
+    d = await dump(); ok("district admin cannot change another district's member photo (404, nothing stored)", r.s === 404 && d.files.length === files0);
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: altUri }, admin: true, cookie: DE.cookie });
+    ok('data entry (edit role) can change the photo of a member in their district', r.s === 200, r.text);
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: altUri } });
+    ok('photo change without admin header/session refused (403/401)', r.s === 403 || r.s === 401);
+
+    await mockCmd('/__fail?mode=storage'); const pBefore = (await memberOf(ids['Ali Raza'])).photo_path;
+    r = await call('PATCH', '/api/admin/member?id=' + ids['Ali Raza'], { body: { photo: FX('photo.jpg') }, admin: true, cookie: S.cookie });
+    await mockCmd('/__fail?mode=');
+    ok('storage failure while changing photo -> error, member keeps the old photo', r.s >= 500 && (await memberOf(ids['Ali Raza'])).photo_path === pBefore);
+  }
+
   // ---- summary ----
   r = await call('GET', '/api/admin/summary', { admin: true, cookie: S.cookie });
   const hy = r.j.districts.find(x => x.district === 'Hyderabad');

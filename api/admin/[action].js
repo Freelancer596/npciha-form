@@ -1,10 +1,11 @@
 'use strict';
 // All administrator endpoints live in this single function (keeps the project within Vercel's
 // free-plan function limit):  /api/admin/<action>
+const crypto = require('crypto');
 const sb = require('../../lib/sb');
 const { MAX_BODY, secHeaders, send, sendError, sameOrigin, readJson, handleError, ipHash } = require('../../lib/http');
 const A = require('../../lib/auth');
-const { validateEdit, maskCnic, normCnic } = require('../../lib/validate');
+const { validateEdit, validatePhoto, maskCnic, normCnic } = require('../../lib/validate');
 const { syncAll } = require('../../lib/google-sheets');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -124,12 +125,23 @@ H.member = async (req, res, admin) => {
 
   if (req.method === 'PATCH') {
     if (!A.can(admin, 'edit')) return DENIED(res);
-    const b = await readJson(req, MAX_BODY.default);
+    const b = await readJson(req, MAX_BODY.register); // larger limit: the body may carry a new photo
     if ('cnic' in b && !A.can(admin, 'cnic_full')) return DENIED(res, 'You may not change the CNIC.');
     if ('district_id' in b && !A.can(admin, 'reassign')) return DENIED(res, 'Only a Super Admin can change a member\'s district.');
-    const v = validateEdit(b);
-    if (!v.ok) return sendError(res, 422, 'validation_failed', Object.keys(v.errors).length ? 'Please correct the highlighted information.' : 'Nothing to update.', { fields: v.errors });
-    const patch = v.patch;
+
+    // Optional new photograph (same JPEG rules as registration). Checked before anything is stored.
+    let ph = null;
+    if ('photo' in b) {
+      ph = validatePhoto(b.photo);
+      if (!ph.ok) return sendError(res, 422, 'validation_failed', ph.error, { fields: { photo: ph.error } });
+    }
+    const { photo: _photo, ...fieldsOnly } = b;
+    let patch = {};
+    if (!ph || Object.keys(fieldsOnly).length) {
+      const v = validateEdit(fieldsOnly);
+      if (!v.ok) return sendError(res, 422, 'validation_failed', Object.keys(v.errors).length ? 'Please correct the highlighted information.' : 'Nothing to update.', { fields: v.errors });
+      patch = v.patch;
+    }
 
     const finalDistrict = 'district_id' in patch ? patch.district_id : m.district_id;
     if ('district_id' in patch && patch.district_id !== null) {
@@ -141,11 +153,21 @@ H.member = async (req, res, admin) => {
       const t = await sb.select('talukas', [['id', 'eq.' + patch.taluka_id], ['district_id', 'eq.' + (finalDistrict === null ? -1 : finalDistrict)], ['select', 'id'], ['limit', '1']], { single: true });
       if (!t.data) return sendError(res, 422, 'validation_failed', 'That taluka does not belong to the member\'s district.', { fields: { taluka_id: 'Taluka does not belong to the district.' } });
     }
+    // New photo goes to a NEW random file name (the old file is removed only after the row points to the new one).
+    // A new name also avoids stale copies in browser/Google-Sheet caches of the old photo.
+    let newPhotoPath = null;
+    if (ph) {
+      newPhotoPath = 'members/' + crypto.randomUUID() + '.jpg';
+      await sb.putObject(newPhotoPath, ph.buffer, 'image/jpeg');
+      patch.photo_path = newPhotoPath;
+    }
+    const dropNew = async () => { if (newPhotoPath) { try { await sb.deleteObject(newPhotoPath); } catch (e2) { console.error('[admin] orphan photo cleanup failed'); } } };
     let out;
     try { out = await sb.update('members', [['id', 'eq.' + m.id]], patch); }
-    catch (e) { if (e.kind === 'db' && e.code === '23505') return sendError(res, 409, 'duplicate_cnic', 'Another member already has this CNIC.'); throw e; }
-    if (!out.length) return sendError(res, 404, 'not_found', 'Member not found.');
-    const changed = Object.keys(patch); // field names only; values (CNIC etc.) are not logged
+    catch (e) { await dropNew(); if (e.kind === 'db' && e.code === '23505') return sendError(res, 409, 'duplicate_cnic', 'Another member already has this CNIC.'); throw e; }
+    if (!out.length) { await dropNew(); return sendError(res, 404, 'not_found', 'Member not found.'); }
+    if (newPhotoPath && m.photo_path) { try { await sb.deleteObject(m.photo_path); } catch (e) { console.error('[admin] old photo delete failed'); } }
+    const changed = Object.keys(patch).map(k => k === 'photo_path' ? 'photo' : k); // field names only; values (CNIC etc.) are not logged
     await A.audit(req, admin, 'update_member', 'member', m.id, { ref: m.ref_no, fields: changed });
     await syncAll('admin');
     return send(res, 200, { ok: true, updated: changed });
