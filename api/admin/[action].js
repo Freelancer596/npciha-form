@@ -5,7 +5,7 @@ const sb = require('../../lib/sb');
 const { MAX_BODY, secHeaders, send, sendError, sameOrigin, readJson, handleError, ipHash } = require('../../lib/http');
 const A = require('../../lib/auth');
 const { validateEdit, maskCnic, normCnic } = require('../../lib/validate');
-const { syncAll, syncNow } = require('../../lib/google-sheets');
+const { syncAll } = require('../../lib/google-sheets');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ['pending', 'approved', 'rejected'];
@@ -199,25 +199,12 @@ H.audit = async (req, res, admin) => {
   return send(res, 200, { ok: true, total: r.count, entries: r.data });
 };
 
-// Latest Google Sheet sync result + manual "Sync now" (super admin only: it rewrites the whole sheet).
+// Latest Google Sheet sync result (super admin only).
 H.sheetstatus = async (req, res, admin) => {
   if (!A.can(admin, 'all_districts')) return DENIED(res);
   const { data } = await sb.select('audit_log', [['action', 'eq.sheet_sync'], ['select', 'at,detail'], ['order', 'at.desc'], ['limit', '1']], { single: true });
   const d = (data && data.detail) || null;
   return send(res, 200, { ok: true, last: data ? { at: data.at, ok: !!(d && d.ok), rows: d && d.rows, via: d && d.via, where: d && d.where, error: d && d.error } : null });
-};
-
-H.sheetsync = async (req, res, admin) => {
-  if (!A.can(admin, 'all_districts')) return DENIED(res);
-  let r;
-  try { r = await syncNow('manual'); }
-  catch (e) {
-    await A.audit(req, admin, 'sheet_sync_manual', 'sheet', null, { ok: false });
-    return sendError(res, 502, 'sheet_sync_failed', 'Google Sheet sync failed.', { reason: String((e && e.message) || 'unknown_error').slice(0, 300) });
-  }
-  if (r && r.skipped) return sendError(res, 409, 'not_configured', 'Google Sheet sync is not configured on the server.');
-  await A.audit(req, admin, 'sheet_sync_manual', 'sheet', null, { ok: true, rows: r.rows });
-  return send(res, 200, { ok: true, rows: r.rows, via: r.via });
 };
 
 // action -> { methods, public?, mutating? }
@@ -226,7 +213,7 @@ const ROUTES = {
   me: { methods: ['GET'] }, districts: { methods: ['GET'] }, members: { methods: ['GET'] },
   member: { methods: ['GET', 'PATCH', 'DELETE'], mutating: false }, status: { methods: ['POST'], mutating: true },
   summary: { methods: ['GET'] }, audit: { methods: ['GET'] },
-  sheetstatus: { methods: ['GET'] }, sheetsync: { methods: ['POST'], mutating: true },
+  sheetstatus: { methods: ['GET'] } 
 };
 
 module.exports = async (req, res) => {

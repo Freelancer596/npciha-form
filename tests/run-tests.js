@@ -396,23 +396,16 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
     const SB = await login('boss', PW);
     await setup({ username: 'hyd.sync', role: 'district_admin', district_code: 'hyderabad' }); const HS = await login('hyd.sync', PW);
     r = await call('GET', '/api/admin/sheetstatus', { admin: true }); ok('sheet status: not signed in -> 401', r.s === 401);
-    r = await call('POST', '/api/admin/sheetsync', { body: {}, admin: true }); ok('sheet sync now: not signed in -> 401', r.s === 401);
     r = await call('GET', '/api/admin/sheetstatus', { admin: true, cookie: HS.cookie }); ok('sheet status: district admin -> 403', r.s === 403);
-    r = await call('POST', '/api/admin/sheetsync', { body: {}, admin: true, cookie: HS.cookie }); ok('sheet sync now: district admin -> 403 (it rewrites the whole sheet)', r.s === 403);
 
     hookMode = 'badsecret';
-    r = await call('POST', '/api/admin/sheetsync', { body: {}, admin: true, cookie: SB.cookie });
-    ok('sheet sync now: failure -> 502 with a short reason (no secrets)', r.s === 502 && /bad_secret/.test(r.j.reason) && !/test-secret|script\.google\.com/.test(r.text), r.text.slice(0, 200));
-    r = await call('GET', '/api/admin/sheetstatus', { admin: true, cookie: SB.cookie });
-    ok('sheet status: shows the last sync FAILED with its reason', r.s === 200 && r.j.last && r.j.last.ok === false && /bad_secret/.test(r.j.last.error) && r.j.last.where === 'manual', r.text.slice(0, 200));
     r = await call('POST', '/api/register', { body: form({ name: 'Sync Fail Person', cnic: '42101-6555555-5', designation: 'Member' }) });
     ok('a failed sheet sync still never blocks a registration (201)', r.s === 201);
     r = await call('GET', '/api/admin/sheetstatus', { admin: true, cookie: SB.cookie });
     ok('failed sync caused by a registration is remembered too', r.j.last.ok === false && r.j.last.where === 'register');
 
     hookMode = 'ok';
-    r = await call('POST', '/api/admin/sheetsync', { body: {}, admin: true, cookie: SB.cookie });
-    ok('sheet sync now: success -> 200 with the number of members sent', r.s === 200 && r.j.rows === state.t.members.length, r.text.slice(0, 200));
+    r = await call('POST', '/api/register', { body: form({ name: 'Sync Ok Person', cnic: '42101-6444444-4', designation: 'Member' }) });
     r = await call('GET', '/api/admin/sheetstatus', { admin: true, cookie: SB.cookie });
     ok('sheet status: shows last sync OK with rows', r.j.last.ok === true && r.j.last.rows === state.t.members.length);
     r = await call('GET', '/api/cron-sync'); ok('daily job: no secret configured -> 404', r.s === 404);
@@ -426,7 +419,6 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
     hookMode = 'badsecret';
     r = await call('GET', '/api/cron-sync', { headers: { Authorization: 'Bearer ' + 'c'.repeat(32) } }); ok('daily job: sheet failure -> 502 (visible in Vercel cron)', r.s === 502);
     delete process.env.CRON_SECRET; delete process.env.GOOGLE_SHEETS_WEBHOOK_URL; delete process.env.GOOGLE_SHEETS_WEBHOOK_SECRET; global.fetch = realFetch;
-    r = await call('POST', '/api/admin/sheetsync', { body: {}, admin: true, cookie: SB.cookie }); ok('sheet sync now: sheet not configured -> 409 (clear message)', r.s === 409);
     ok('vercel.json schedules the daily job', JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'vercel.json'), 'utf8')).crons.some(c => c.path === '/api/cron-sync'));
     await mockCmd('/__ratereset');
   }
