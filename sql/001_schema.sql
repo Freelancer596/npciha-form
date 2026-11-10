@@ -34,7 +34,7 @@ create table if not exists public.members (
   father_name       text not null check (char_length(father_name) between 2 and 100),
   cnic              text not null,
   dob               date not null check (dob >= date '1900-01-01'),
-  religion          text not null check (religion in ('Islam','Hinduism','Christianity','Sikhism','Other')),
+  religion          text not null check (religion in ('Islam','Hindu','Christianity','Sikhism','Other')),
   education         text check (char_length(education) <= 100),
   designation       text not null check (char_length(designation) between 1 and 100),
   wing              text not null check (char_length(wing) between 1 and 50),
