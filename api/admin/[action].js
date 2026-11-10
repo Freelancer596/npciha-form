@@ -24,7 +24,6 @@ function memberFilters(admin, q) {
   if (!A.can(admin, 'all_districts')) f.push(['district_id', 'eq.' + admin.district_id]);
   else if (q.district_id === 'none') f.push(['district_id', 'is.null']);
   else if (/^\d+$/.test(q.district_id || '')) f.push(['district_id', 'eq.' + q.district_id]);
-  if (/^\d+$/.test(q.taluka_id || '')) f.push(['taluka_id', 'eq.' + q.taluka_id]);
   if (STATUSES.includes(q.status)) f.push(['status', 'eq.' + q.status]);
   if (/^\d{4}-\d{2}-\d{2}$/.test(q.date_from || '')) f.push(['created_at', 'gte.' + q.date_from + 'T00:00:00+05:00']);
   if (/^\d{4}-\d{2}-\d{2}$/.test(q.date_to || '')) f.push(['created_at', 'lte.' + q.date_to + 'T23:59:59+05:00']);
@@ -32,7 +31,12 @@ function memberFilters(admin, q) {
   if (s) {
     const parts = ['name.ilike.*' + s + '*', 'ref_no.ilike.*' + s + '*'];
     // CNIC search is allowed for authorised roles only
-    if (A.can(admin, 'cnic_search') && /^[0-9-]{4,15}$/.test(s)) parts.push('cnic.ilike.*' + s + '*');
+    if (A.can(admin, 'cnic_search') && /^[0-9-]{4,15}$/.test(s)) {
+      parts.push('cnic.ilike.*' + s + '*');
+      // 13 digits typed without dashes (4310398914497) -> stored form 43103-9891449-7
+      const d = s.replace(/\D/g, '');
+      if (d.length === 13) parts.push('cnic.eq.' + d.slice(0, 5) + '-' + d.slice(5, 12) + '-' + d.slice(12));
+    }
     f.push(['or', '(' + parts.join(',') + ')']);
   }
   return f;
@@ -102,11 +106,39 @@ H.districts = async (req, res, admin) => {
   return send(res, 200, { ok: true, ...g });
 };
 
+// Comparison key for names typed by people: ignores case, spaces, punctuation and Arabic diacritics,
+// so "Kandh Kot", "kandhkot" and "KANDHKOT" are the same taluka.
+const MAX_SCAN = 20000;
+const normName = s => String(s || '').normalize('NFKD').replace(/[ً-ٰٟ]/g, '').toLowerCase().replace(/[^a-z0-9؀-ۿ]/g, '');
+
 H.members = async (req, res, admin) => {
   const limit = int(req.query.limit, 25, 1, 100), offset = int(req.query.offset, 0, 0, 1000000);
-  const q = [...memberFilters(admin, req.query), ['select', LIST_COLS], ['order', 'created_at.desc'], ['limit', String(limit)], ['offset', String(offset)]];
-  const r = await sb.select('members', q, { count: true });
-  return send(res, 200, { ok: true, total: r.count, limit, offset, members: r.data.map(m => shapeRow(admin, m)) });
+  const filters = memberFilters(admin, req.query);
+  const talukaId = /^\d+$/.test(req.query.taluka_id || '') ? Number(req.query.taluka_id) : null;
+
+  // No taluka chosen: plain paged query, counted by the database.
+  if (talukaId === null) {
+    const q = [...filters, ['select', LIST_COLS], ['order', 'created_at.desc'], ['limit', String(limit)], ['offset', String(offset)]];
+    const r = await sb.select('members', q, { count: true });
+    return send(res, 200, { ok: true, total: r.count, limit, offset, members: r.data.map(m => shapeRow(admin, m)) });
+  }
+
+  // Taluka chosen: many older members only have the typed taluka name (taluka_id is empty),
+  // so match on the taluka id OR the normalised name within the same district. Every matching
+  // row is read first, then the page is cut, so no record is hidden by the page size.
+  const t = await sb.select('talukas', [['select', 'id,name,district_id'], ['id', 'eq.' + talukaId], ['limit', '1']]);
+  const taluka = (t.data || [])[0];
+  const wantName = normName(taluka && taluka.name);
+  const rows = [];
+  for (let off = 0; rows.length < MAX_SCAN; off += 1000) {
+    const page = await sb.select('members', [...filters, ['select', LIST_COLS + ',taluka_name'], ['order', 'created_at.desc,id.asc'], ['limit', '1000'], ['offset', String(off)]]);
+    rows.push(...(page.data || []));
+    if (!page.data || page.data.length < 1000) break;
+  }
+  const hits = rows.filter(m => m.taluka_id === talukaId ||
+    (wantName && taluka && m.district_id === taluka.district_id && normName(m.taluka_name) === wantName));
+  const members = hits.slice(offset, offset + limit).map(m => { const { taluka_name, ...rest } = m; return shapeRow(admin, rest); });
+  return send(res, 200, { ok: true, total: hits.length, limit, offset, members });
 };
 
 H.member = async (req, res, admin) => {

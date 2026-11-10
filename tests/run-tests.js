@@ -189,6 +189,12 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
   r = await call('PATCH', '/api/admin/member?id=' + ids['Mary John'], { body: { district_id: 2, taluka_id: 1 }, admin: true, cookie: S.cookie }); ok('taluka from another district rejected (422)', r.s === 422);
   r = await call('GET', '/api/admin/members?district_id=1', { admin: true, cookie: S.cookie }); ok('district filter (Hyderabad) -> 2 members', r.j.total === 2 && r.j.members.every(m => m.district_id === 1));
   r = await call('GET', '/api/admin/members?district_id=1&taluka_id=2', { admin: true, cookie: S.cookie }); ok('taluka filter (Qasimabad) -> Sana Gul only', r.j.total === 1 && r.j.members[0].name === 'Sana Gul');
+  // Older records often have only the typed taluka name (no taluka_id). Spelling/case/spaces must not hide them.
+  { const sg = state.t.members.find(m => m.name === 'Sana Gul'); const saved = { t: sg.taluka_id, n: sg.taluka_name };
+    sg.taluka_id = null; sg.taluka_name = '  QASIM   ABAD ';
+    r = await call('GET', '/api/admin/members?district_id=1&taluka_id=2', { admin: true, cookie: S.cookie }); ok('taluka filter finds a record that has only a typed taluka name (case/spaces ignored)', r.j.total === 1 && r.j.members[0].name === 'Sana Gul', r.text);
+    r = await call('GET', '/api/admin/members?district_id=1&taluka_id=2&status=approved', { admin: true, cookie: S.cookie }); ok('taluka + status filter together', r.s === 200 && r.j.total === 0);
+    sg.taluka_id = saved.t; sg.taluka_name = saved.n; }
   r = await call('GET', '/api/admin/members?district_id=none', { admin: true, cookie: S.cookie }); ok('unassigned filter -> Mary John', r.j.total === 1 && r.j.members[0].name === 'Mary John');
   r = await call('GET', '/api/admin/members?q=ali', { admin: true, cookie: S.cookie }); ok('search by name', r.j.total === 1 && r.j.members[0].name === 'Ali Raza');
   r = await call('GET', '/api/admin/members?q=' + encodeURIComponent(regs[1]), { admin: true, cookie: S.cookie }); ok('search by membership number', r.j.total === 1 && r.j.members[0].name === 'Sana Gul');
