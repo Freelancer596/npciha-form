@@ -526,6 +526,16 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
     await mockCmd('/__ratereset');
   }
 
+  // ---- guard: no WhatsApp integration in the active application ----
+  {
+    const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+    const files = ['public', 'api', 'lib'].flatMap(d => walk(path.join(__dirname, '..', d))).filter(f => /\.(html|js|json|css)$/i.test(f));
+    const hits = files.filter(f => /whats\s?app|wa\.me|api\.whatsapp|twilio|graph\.facebook/i.test(fs.readFileSync(f, 'utf8')));
+    ok('no WhatsApp button, link, API call or automation in public/, api/ or lib/', hits.length === 0, hits.join(', '));
+    const pkg = fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8');
+    ok('no WhatsApp/SMS npm package in package.json', !/whatsapp|twilio|baileys|venom|wa-automate/i.test(pkg));
+  }
+
   // ---- summary ----
   const passed = results.filter(x => x.pass).length, failed = results.length - passed;
   console.log(`\n=== ${passed} passed, ${failed} failed, ${results.length} total ===`);
