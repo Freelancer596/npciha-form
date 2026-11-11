@@ -536,6 +536,98 @@ const setup = (o) => call('POST', '/api/setup', { body: { token: process.env.SET
     ok('no WhatsApp/SMS npm package in package.json', !/whatsapp|twilio|baileys|venom|wa-automate/i.test(pkg));
   }
 
+  // ========== advanced search, filters, facets, export (added 2026-11-12) ==========
+  {
+    const zlib = require('zlib');
+    const unzip = buf => { const out = {}; let p = 0; while (p + 30 <= buf.length && buf.readUInt32LE(p) === 0x04034b50) { const method = buf.readUInt16LE(p + 8), csize = buf.readUInt32LE(p + 18), nlen = buf.readUInt16LE(p + 26), elen = buf.readUInt16LE(p + 28); const name = buf.slice(p + 30, p + 30 + nlen).toString('utf8'); const data = buf.slice(p + 30 + nlen + elen, p + 30 + nlen + elen + csize); out[name] = method === 8 ? zlib.inflateRawSync(data).toString('utf8') : data.toString('utf8'); p += 30 + nlen + elen + csize; } return out; };
+    const raw = async (p, cookie) => { const r = await fetch(BASE + p, { headers: { Cookie: cookie, 'X-Requested-With': 'npciha' } }); return { s: r.status, type: r.headers.get('content-type') || '', disp: r.headers.get('content-disposition') || '', buf: Buffer.from(await r.arrayBuffer()) }; };
+    const search = async (qs, cookie) => call('GET', '/api/admin/members?' + qs, { admin: true, cookie });
+
+    await mockCmd('/__reset'); await mockCmd('/__ratereset');
+    await setup({ username: 'boss', role: 'super_admin' }); await setup({ username: 'hyd.admin', role: 'district_admin', district_code: 'hyderabad' }); await setup({ username: 'hyd.entry', role: 'data_entry', district_code: 'hyderabad' });
+    const SA = await login('boss', PW), HA2 = await login('hyd.admin', PW), DE2 = await login('hyd.entry', PW);
+    const addM = o => state.t.members.push({ id: uuid(), ref_no: o.ref, name: o.name, father_name: 'Father Name', cnic: o.cnic, dob: '1990-01-01', religion: 'Islam', education: 'BA', designation: o.designation || 'Member', wing: o.wing || 'HRC', office_level: o.level || null, office_area: null, residence_address: 'House 1 Road', office_address: 'Office 1 Road', profession: 'Teacher', contact: o.contact, email: 'x@example.com', photo_path: null, district_id: o.d === undefined ? 1 : o.d, taluka_id: o.t === undefined ? null : o.t, taluka_name: o.tn || null, province_id: o.p === undefined ? 1 : o.p, status: o.status || 'pending', status_note: null, reviewed_by: null, reviewed_at: null, created_at: o.at || new Date().toISOString(), updated_at: new Date().toISOString() });
+    state.t.talukas.push({ id: 5, district_id: 1, name: 'Tangwani', name_ur: null, active: true, verified: true, source: 'test' });
+    addM({ ref: 'NPCIHA/2026/000001', name: 'Ali Raza', cnic: '42101-1111111-1', contact: '03001111111', d: 1, t: 1, tn: 'Latifabad', level: 'taluka', designation: 'Chairman', status: 'approved', at: '2026-11-01T05:00:00Z' });
+    addM({ ref: 'NPCIHA/2026/000002', name: 'Sana Gul', cnic: '42101-2222222-2', contact: '03002222222', d: 1, t: 2, tn: 'Qasimabad', level: 'district', designation: 'Secretary', status: 'pending', at: '2026-11-02T05:00:00Z' });
+    addM({ ref: 'NPCIHA/2026/000003', name: 'Dilip Kumar', cnic: '42101-3333333-3', contact: '03003333333', d: 2, t: 3, tn: 'Rohri', level: 'city', designation: 'Patron', status: 'rejected', at: '2026-11-03T05:00:00Z' });
+    addM({ ref: 'NPCIHA/2026/000004', name: 'Tangwani Member', cnic: '42101-4444444-4', contact: '03004444444', d: 1, t: null, tn: 'TANGWANI', level: 'taluka', designation: 'Member', status: 'approved', at: '2026-11-04T05:00:00Z' });
+    addM({ ref: 'NPCIHA/2026/000005', name: 'Latifabad Typed', cnic: '42101-5555555-5', contact: '03005555555', d: 1, t: null, tn: 'Taluka Latifabad', level: 'taluka', designation: 'Member', status: 'approved', at: '2026-11-05T05:00:00Z' });
+    addM({ ref: 'NPCIHA/2026/000006', name: 'Tangwani By Id', cnic: '42101-6666666-6', contact: '03006666666', d: 1, t: 5, tn: 'Tangwani', level: 'member', designation: 'Adviser', status: 'pending', at: '2026-11-06T05:00:00Z' });
+    addM({ ref: 'NPCIHA/2026/000007', name: 'علی رضا', cnic: '42101-7777777-7', contact: '03007777777', d: 1, t: 2, tn: 'Qasimabad', level: 'provincial', designation: 'Secretary', status: 'approved', at: '2026-11-07T05:00:00Z', p: 1 });
+    addM({ ref: 'NPCIHA/2026/000008', name: 'Old Record Unassigned', cnic: '42101-8888888-8', contact: '03008888888', d: null, t: null, tn: null, level: 'member', designation: 'Member', status: 'pending', at: '2026-11-08T05:00:00Z', p: null });
+    const N = state.t.members.length;
+
+    let r = await search('name=a', SA.cookie); ok('search: one letter in name box refused (400)', r.s === 400 && r.j.error === 'search_too_short');
+    r = await search('name=ali', SA.cookie); ok('search: name box finds Ali Raza only', r.j.total === 1 && r.j.members[0].name === 'Ali Raza', r.text);
+    r = await search('cnic=4210111111111', SA.cookie); ok('search: 13-digit CNIC without dashes finds the member (super admin)', r.j.total === 1 && r.j.members[0].name === 'Ali Raza');
+    r = await search('cnic=42101-2222222-2', SA.cookie); ok('search: CNIC with dashes finds the member', r.j.total === 1 && r.j.members[0].name === 'Sana Gul');
+    r = await search('cnic=1111111', SA.cookie); ok('search: partial CNIC (4+ digits) matches', r.j.total === 1 && r.j.members[0].name === 'Ali Raza');
+    r = await search('cnic=42101', SA.cookie); ok('search: CNIC prefix returns exactly the records whose CNIC starts with it', r.j.total === state.t.members.filter(m => /^42101/.test(m.cnic)).length);
+    r = await search('cnic=4210111111111', DE2.cookie); ok('search: data entry cannot search by CNIC (no results, not a leak)', r.s === 200 && r.j.total === 0 && !r.text.includes('42101-1111111'));
+    r = await search('mobile=%2B92%20300%201111111', SA.cookie); ok('search: mobile +92 300 1111111 finds Ali Raza', r.j.total === 1 && r.j.members[0].name === 'Ali Raza', r.text);
+    r = await search('mobile=0300-2222222', SA.cookie); ok('search: mobile 0300-2222222 finds Sana Gul', r.j.total === 1 && r.j.members[0].name === 'Sana Gul');
+    r = await search('mobile=12', SA.cookie); ok('search: mobile with fewer than 7 digits refused (400)', r.s === 400);
+    r = await search('ref=NPCIHA%2F2026%2F000002', SA.cookie); ok('search: full application number finds Sana Gul', r.j.total === 1 && r.j.members[0].name === 'Sana Gul');
+    r = await search('ref=000003', SA.cookie); ok('search: part of application number finds Dilip Kumar', r.j.total === 1 && r.j.members[0].name === 'Dilip Kumar');
+    r = await search('name=%D8%B9%D9%84%DB%8C', SA.cookie); ok('search: Urdu name text finds the Urdu-named member', r.j.total === 1 && r.j.members[0].name === 'علی رضا');
+    r = await search('status=approved&office_level=taluka&district_id=1', SA.cookie); ok('combined filters: approved + taluka level + Hyderabad -> 3 (Ali, Tangwani Member, Latifabad Typed)', r.j.total === 3, r.text);
+    r = await search('status=approved&office_level=taluka&district_id=1&name=tangwani', SA.cookie); ok('combined: adding a name box narrows to 1 (Tangwani Member)', r.j.total === 1 && r.j.members[0].name === 'Tangwani Member');
+    r = await search('district_id=1&taluka_id=1', SA.cookie); ok('taluka Latifabad: matches by taluka id AND by typed name "Taluka Latifabad" -> 2', r.j.total === 2 && r.j.members.map(m => m.name).sort().join('|') === 'Ali Raza|Latifabad Typed', r.text);
+    r = await search('district_id=1&taluka_id=5', SA.cookie); ok('taluka Tangwani: typed name "TANGWANI" (no taluka id) + taluka id 5 -> 2', r.j.total === 2 && r.j.members.map(m => m.name).sort().join('|') === 'Tangwani By Id|Tangwani Member', r.text);
+    r = await search('district_id=1&taluka_id=2', SA.cookie); ok('taluka Qasimabad: 2 (Sana Gul by id, Ali Raza excluded, Arabic-name member by id)', r.j.total === 2, r.text);
+    r = await search('district_id=2&taluka_id=5', SA.cookie); ok('taluka from another district does not leak (0)', r.j.total === 0);
+    r = await search('designation=Secretary', SA.cookie); ok('designation filter: Secretary -> 2', r.j.total === 2);
+    r = await search('wing=HRC', SA.cookie); ok('wing filter: HRC -> all members', r.j.total === N);
+    r = await search('wing=Other', SA.cookie); ok('wing filter: unknown wing -> 0', r.j.total === 0);
+    r = await search('office_level=city', SA.cookie); ok('office level filter: city -> Dilip only', r.j.total === 1 && r.j.members[0].name === 'Dilip Kumar');
+    r = await search('office_level=bogus', SA.cookie); ok('office level filter: invalid value ignored (not an injection)', r.s === 200 && r.j.total === N);
+    r = await search('province_id=1', SA.cookie); ok('province filter: excludes the record with no province', r.j.total === N - 1 && !r.j.members.some(m => m.name === 'Old Record Unassigned'));
+    r = await search('status=rejected', SA.cookie); ok('status filter: rejected -> Dilip only', r.j.total === 1 && r.j.members[0].status === 'rejected');
+    r = await search('date_from=2026-11-04&date_to=2026-11-06', SA.cookie); ok('registration date range filter: 3 records', r.j.total === 3);
+    r = await search('district_id=none', SA.cookie); ok('unassigned filter still works', r.j.total === 1 && r.j.members[0].name === 'Old Record Unassigned');
+    r = await search('limit=2&offset=0', SA.cookie); const p1 = r.j.members.map(m => m.id);
+    r = await search('limit=2&offset=2', SA.cookie); const p2 = r.j.members.map(m => m.id);
+    ok('pagination: two pages of 2 are different and total is the full count', r.j.total === N && p1.length === 2 && p2.length === 2 && !p1.some(id => p2.includes(id)));
+    r = await search('limit=2&offset=' + (N + 5), SA.cookie); ok('pagination: page past the end is empty, total still correct', r.j.members.length === 0 && r.j.total === N);
+    r = await search('limit=2&offset=0&taluka_id=1&district_id=1', SA.cookie); ok('pagination works with the taluka matcher too', r.j.total === 2 && r.j.members.length === 2);
+    r = await call('GET', '/api/admin/facets', { admin: true, cookie: SA.cookie }); ok('facets: super admin sees all designations and wings', r.j.designations.includes('Patron') && r.j.designations.includes('Secretary') && r.j.wings.includes('HRC'), r.text);
+    r = await call('GET', '/api/admin/facets', { admin: true, cookie: HA2.cookie }); ok('facets: district admin sees only own district designations (no Patron)', r.s === 200 && !r.j.designations.includes('Patron') && r.j.designations.includes('Secretary'), r.text);
+    r = await call('GET', '/api/admin/summary', { admin: true, cookie: SA.cookie }); ok('statistics: total equals every record in the database', r.j.totals.total === N && r.j.totals.approved === state.t.members.filter(m => m.status === 'approved').length);
+    r = await call('GET', '/api/admin/summary', { admin: true, cookie: HA2.cookie }); ok('statistics: district admin sees only own district totals', r.j.totals.total === state.t.members.filter(m => m.district_id === 1).length);
+
+    // ---- exports ----
+    let x = await raw('/api/admin/export?format=xlsx&status=approved&office_level=taluka&district_id=1', SA.cookie);
+    ok('excel export: 200, xlsx type, attachment file name', x.s === 200 && /spreadsheetml/.test(x.type) && /attachment; filename="NPCIHA-members-\d{4}-\d{2}-\d{2}\.xlsx"/.test(x.disp) && x.buf.slice(0, 2).toString() === 'PK', x.disp);
+    let files = unzip(x.buf);
+    ok('excel export: contains the Members and Filters sheets', !!files['xl/worksheets/sheet1.xml'] && !!files['xl/worksheets/sheet2.xml'] && /Members/.test(files['xl/workbook.xml']) && /Filters/.test(files['xl/workbook.xml']));
+    const rowsIn = f => (f.match(/<row r="/g) || []).length;
+    ok('excel export matches filters: 3 members + header row', rowsIn(files['xl/worksheets/sheet1.xml']) === 4, rowsIn(files['xl/worksheets/sheet1.xml']));
+    ok('excel export: Urdu name written correctly', (await raw('/api/admin/export?format=xlsx&name=%D8%B9%D9%84%DB%8C', SA.cookie)).buf.length > 0 && unzip((await raw('/api/admin/export?format=xlsx&name=%D8%B9%D9%84%DB%8C', SA.cookie)).buf)['xl/worksheets/sheet1.xml'].includes('علی رضا'));
+    ok('excel export: search results export equals the table (name box)', rowsIn(unzip((await raw('/api/admin/export?format=xlsx&name=ali', SA.cookie)).buf)['xl/worksheets/sheet1.xml']) === 2);
+    x = await raw('/api/admin/export?format=xlsx', SA.cookie); files = unzip(x.buf);
+    ok('export ALL (no filters) contains every member in scope', rowsIn(files['xl/worksheets/sheet1.xml']) === N + 1, rowsIn(files['xl/worksheets/sheet1.xml']));
+    x = await raw('/api/admin/export?format=xlsx', HA2.cookie); files = unzip(x.buf);
+    ok('export by district admin contains only own district', rowsIn(files['xl/worksheets/sheet1.xml']) === state.t.members.filter(m => m.district_id === 1).length + 1);
+    x = await raw('/api/admin/export?format=xlsx', DE2.cookie); ok('export is refused for data entry role (403)', x.s === 403);
+    r = await call('GET', '/api/admin/export?format=json&status=approved', { admin: true, cookie: SA.cookie }); ok('json export (used for print and PDF) matches list filters', r.s === 200 && r.j.rows.length === state.t.members.filter(m => m.status === 'approved').length && r.j.headers.includes('Application No.') && r.j.rows[0].length === r.j.headers.length, r.text.slice(0, 200));
+    ok('json export: serial numbers start at 1', r.j.rows[0][0] === 1);
+    r = await call('GET', '/api/admin/export?format=json&q=', { admin: true, cookie: SA.cookie }); ok('export: an empty search box does not filter anything', r.s === 200 && r.j.rows.length === N);
+    r = await call('GET', '/api/admin/export?format=json&name=a', { admin: true, cookie: SA.cookie }); ok('export: short search refused with a message (400)', r.s === 400 && /at least 2/.test(r.j.message));
+    const aud = state.t.audit_log.filter(a => a.action === 'export_members'); ok('export is written to the audit log', aud.length >= 4);
+    ok('audit log for exports holds no CNIC, mobile or name values', !JSON.stringify(aud).match(/42101|0300|علی|Ali Raza/));
+
+    // too many rows: refused, never silently cut
+    const before = state.t.members.length;
+    for (let i = 0; i < 5001; i++) state.t.members.push({ ...state.t.members[0], id: uuid(), ref_no: 'BULK/' + i, cnic: '42199-' + String(i).padStart(7, '0') + '-' + (i % 10), contact: '0300' + String(1000000 + i), status: 'approved' });
+    x = await raw('/api/admin/export?format=xlsx&status=approved', SA.cookie);
+    ok('export over 5000 records refused (413) instead of cut short', x.s === 413 && /Narrow the filters/.test(x.buf.toString()));
+    const approvedNow = state.t.members.filter(m => m.status === 'approved').length;
+    r = await search('status=approved&limit=25', SA.cookie); ok('the list still pages through large sets (total and page size)', r.j.total === approvedNow && r.j.members.length === 25);
+    state.t.members.splice(before);
+    ok('large test data removed again (back to the original record count)', state.t.members.length === N);
+  }
+
   // ---- summary ----
   const passed = results.filter(x => x.pass).length, failed = results.length - passed;
   console.log(`\n=== ${passed} passed, ${failed} failed, ${results.length} total ===`);
